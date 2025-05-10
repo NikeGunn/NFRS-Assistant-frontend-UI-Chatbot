@@ -1,108 +1,96 @@
-# NFRS Assistant Frontend
+# NFRS Assistant
 
-A modern, ChatGPT-like web application that connects to the NFRS Assistant backend API to provide easy access to Nepal Financial Reporting Standards information.
+A modern, AI-powered web application that provides intuitive access to Nepal Financial Reporting Standards information through a conversational interface.
+
+![NFRS Assistant UI](https://github.com/NikeGunn/imagess/blob/main/Nepal%20Financial%20Reporting%20Standards%20(NFRS)/nfrs.png?raw=true)
 
 ## Features
 
-- **User Authentication**: Secure login system using JWT tokens
-- **Chat Interface**: Conversational UI similar to ChatGPT
-- **Chat Sessions**: Create and manage multiple chat sessions
-- **Document Sources**: View document sources for each assistant response
-- **Responsive Design**: Works on desktop and mobile devices
-- **Language Support**: Support for both English and Nepali languages
+- **Conversational Interface**: Interact naturally with NFRS information using a ChatGPT-like experience
+- **Secure Authentication**: JWT-based login system with session management
+- **Multi-Session Support**: Create and organize multiple chat conversations
+- **Source Attribution**: View the original document sources for every assistant response
+- **Bilingual Support**: Seamlessly switch between English and Nepali interfaces
+- **Responsive Design**: Optimized experience across desktop and mobile devices
 
 ## Tech Stack
 
-- React 18
-- TypeScript
-- React Router v6
-- Styled Components
-- Axios for API requests
-- React Icons
+- **Frontend**: React 18, TypeScript, React Router v6, Styled Components
+- **State Management**: React Context API
+- **API Communication**: Axios
+- **UI Components**: Custom components with React Icons
+- **Authentication**: JWT token implementation
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v14 or later)
+- Node.js (v14+)
 - npm or yarn
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
-
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/nfrs-assistant-frontend.git
+
+# Navigate to project directory
+cd nfrs-assistant-frontend
+
+# Install dependencies
 npm install
 ```
 
 ### Configuration
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the root directory:
 
 ```
 REACT_APP_API_URL=http://localhost:8000
 ```
 
-Replace the URL with your backend API endpoint.
-
-### Running the App
-
-Start the development server:
+### Development
 
 ```bash
 npm start
 ```
 
-The application will be available at [http://localhost:3000](http://localhost:3000).
+Visit [http://localhost:3000](http://localhost:3000) to view the application.
 
-### Building for Production
+### Production Build
 
 ```bash
 npm run build
 ```
 
-## Usage
+## Usage Guide
 
-### Authentication
+### Authentication Flow
 
-1. Access the application and you will be redirected to the login page
-2. Enter your username and password to authenticate
-3. After successful login, you will be redirected to the chat interface
+1. Navigate to the login page
+2. Enter your credentials
+3. Upon successful authentication, you'll be redirected to the chat interface
 
-### Chat Interface
+### Using the Chat Interface
 
-- **Create New Chat**: Click on "New Chat" button in the sidebar
-- **Send Message**: Type your question in the input field and press Enter or click the send icon
-- **Chat History**: View previous chat sessions in the sidebar
-- **Sources**: View document sources under each assistant response when available
+- **New Conversation**: Click "New Chat" in the sidebar
+- **Ask Questions**: Type your NFRS-related query and press Enter
+- **View History**: Access previous conversations from the sidebar
+- **Check Sources**: Expand source references below each AI response
+- **Switch Language**: Toggle between English and Nepali using the language selector
 
-## API Integration
-
-The frontend integrates with the NFRS Assistant backend API, which provides:
-
-- Authentication services (JWT tokens)
-- Document management
-- Query processing
-- Chat session management
-
-The API endpoints are defined in `src/services/api.service.ts`.
-
-## Folder Structure
+## Project Structure
 
 ```
-public/             # Public assets
 src/
-  components/       # Reusable components
-  context/          # React context providers
-  pages/            # Page components
-    auth/           # Authentication pages
-    chat/           # Chat interface pages
-  services/         # API service layer
-  types/            # TypeScript type definitions
-  utils/            # Utility functions
-  App.tsx           # Main application component
-  index.tsx         # Application entry point
+├── components/     # Reusable UI components
+├── context/        # React context providers
+├── pages/          # Main application pages
+│   ├── auth/       # Login and registration
+│   └── chat/       # Main chat interface
+├── services/       # API integration
+├── types/          # TypeScript definitions
+└── utils/          # Helper functions
 ```
 
 ## License
