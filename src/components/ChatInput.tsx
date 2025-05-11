@@ -1,100 +1,98 @@
-import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
+// This file is a module
+import React, { useState, useRef, ChangeEvent, KeyboardEvent } from 'react';
+import { FiPaperclip, FiSend } from 'react-icons/fi';
 import styled from 'styled-components';
-import { FiSend, FiMic, FiPaperclip } from 'react-icons/fi';
-import { InputContainer, MessageInput, SendButton, LoadingSpinner } from './StyledComponents';
 import IconWrapper from './IconWrapper';
+// Empty export to ensure file is treated as a module
+export { };
 
-// Enhanced styled components for ChatInput
-const EnhancedInputContainer = styled(InputContainer)`
-  margin: 1.5rem auto;
-  width: 90%;
-  max-width: 900px;
-  position: relative;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e5e5;
-  transition: all 0.2s ease;
+interface ChatInputProps {
+  onSendMessage: (message: string) => void;
+  onFileUpload?: (file: File) => void;
+  isLoading?: boolean;
+}
 
-  &:focus-within {
-    border-color: #10A37F;
-    box-shadow: 0 3px 10px rgba(16, 163, 127, 0.1);
+const InputContainer = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 25%; /* Match MessageList padding */
+  background-color: transparent;
+  border-top: 1px solid #e1e4e8;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+
+  /* Responsive adjustments to match MessageList */
+  @media (max-width: 1400px) {
+    padding: 0.8rem 20%;
+  }
+
+  @media (max-width: 1200px) {
+    padding: 0.8rem 15%;
+  }
+
+  @media (max-width: 1024px) {
+    padding: 0.8rem 10%;
   }
 
   @media (max-width: 768px) {
-    margin: 1rem auto;
+    padding: 0.8rem 5%;
   }
 `;
 
-const EnhancedMessageInput = styled(MessageInput)`
-  padding: 1rem 4rem 1rem 1.25rem;
-  border: none;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  box-shadow: none;
-  resize: none;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  line-height: 1.5;
-
-  &:focus {
-    outline: none;
-    box-shadow: none;
-  }
-
-  &::placeholder {
-    color: #a9a9a9;
-  }
-`;
-
-const EnhancedSendButton = styled(SendButton)`
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  background-color: #10A37F;
-  color: white;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
+const InputWrapper = styled.div`
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background-color: #0c8a6b;
-    transform: scale(1.05);
-  }
-
-  &:disabled {
-    background-color: #e5e5e5;
-    color: #a9a9a9;
-    cursor: not-allowed;
-    transform: none;
-  }
+  width: 100%;
+  background-color: #fff; /* White background like ChatGPT */
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); /* Enhanced subtle shadow like ChatGPT */
+  border: 1px solid #e5e5e5;
 `;
 
-const InputActions = styled.div`
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  display: flex;
-  gap: 8px;
+const StyledTextarea = styled.textarea`
+  flex: 1;
+  min-height: 24px; /* Minimum height */
+  max-height: 150px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  resize: none;
+  outline: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  background-color: transparent;
+  font-family: inherit;
+  overflow-y: auto;
+
+  /* Ensure vertical alignment of placeholder */
+  &::placeholder {
+    color: #8e8ea0;
+    line-height: 24px; /* Vertically center placeholder */
+  }
+
+  &:focus {
+    box-shadow: none;
+  }
 `;
 
 const ActionButton = styled.button`
-  background: transparent;
-  border: none;
-  width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px; /* Slightly larger button */
+  height: 36px;
+  margin-left: 4px;
+  border: none;
+  border-radius: 8px; /* Slightly less rounded, more like ChatGPT */
+  background-color: transparent;
   color: #6e6e80;
-  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(16, 163, 127, 0.1);
     color: #10A37F;
   }
 
@@ -104,113 +102,115 @@ const ActionButton = styled.button`
   }
 `;
 
-const MessageLengthIndicator = styled.div<{ isApproachingLimit: boolean; isOverLimit: boolean }>`
-  position: absolute;
-  right: 60px;
-  bottom: 10px;
-  font-size: 12px;
-  color: ${props => (props.isOverLimit ? '#e34c4c' : props.isApproachingLimit ? '#e69744' : '#a9a9a9')};
-  padding: 4px;
-  border-radius: 4px;
-  pointer-events: none;
+const SendButton = styled(ActionButton)`
+  color: white;
+  background-color: ${props => props.disabled ? '#8e8ea0' : '#10A37F'};
+
+  &:hover {
+    background-color: ${props => props.disabled ? '#8e8ea0' : '#0d876a'};
+    color: white;
+  }
 `;
 
-const TypingIndicator = styled.div`
-  position: absolute;
-  top: -30px;
-  left: 16px;
-  font-size: 0.85rem;
-  color: #6e6e80;
-  font-style: italic;
+const HiddenFileInput = styled.input`
+  display: none;
 `;
 
-interface ChatInputProps {
-  onSendMessage: (message: string) => void;
-  isLoading: boolean;
-}
-
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
+const ChatInput: React.FC<ChatInputProps> = ({
+  onSendMessage,
+  onFileUpload,
+  isLoading = false
+}) => {
   const [message, setMessage] = useState('');
-  const [showActions, setShowActions] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // For demo purposes
-  const MAX_MESSAGE_LENGTH = 2000;
-  const isApproachingLimit = message.length > MAX_MESSAGE_LENGTH * 0.8;
-  const isOverLimit = message.length > MAX_MESSAGE_LENGTH;
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-    }
-  }, [message]);
-
-  const handleSend = () => {
-    if (message.trim() && !isLoading && !isOverLimit) {
-      onSendMessage(message.trim());
-      setMessage('');
-
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
-    }
+    // Improved auto-resize textarea based on content
+    const textarea = e.target;
+    textarea.style.height = '24px'; // Reset to minimum height
+    const scrollHeight = textarea.scrollHeight;
+    textarea.style.height = Math.min(scrollHeight, 150) + 'px';
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleSendMessage();
     }
-
-    // If user starts typing, show actions
-    setShowActions(true);
   };
 
-  const handleMicClick = () => {
-    // Placeholder for voice input functionality
-    alert("Voice input functionality would be implemented here");
+  const handleSendMessage = () => {
+    const trimmedMessage = message.trim();
+    if (trimmedMessage && !isLoading) {
+      onSendMessage(trimmedMessage);
+      setMessage('');
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '24px';
+      }
+    }
   };
 
   const handleAttachClick = () => {
-    // Placeholder for file attachment functionality
-    alert("File attachment functionality would be implemented here");
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && onFileUpload) {
+      onFileUpload(files[0]);
+      // Reset the input
+      e.target.value = '';
+    }
   };
 
   return (
-    <EnhancedInputContainer>
-      {isLoading && <TypingIndicator>NFRS Assistant is typing...</TypingIndicator>}
+    <InputContainer>
+      <InputWrapper>
+        {onFileUpload && (
+          <>
+            <ActionButton
+              type="button"
+              onClick={handleAttachClick}
+              disabled={isLoading}
+              title="Attach file"
+            >
+              <IconWrapper Icon={FiPaperclip} size={16} />
+            </ActionButton>
+            <HiddenFileInput
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".pdf,.doc,.docx,.txt,.md"
+            />
+          </>
+        )}
 
-      <EnhancedMessageInput
-        ref={textareaRef}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setShowActions(true)}
-        onBlur={() => setShowActions(message.length > 0)}
-        placeholder="Ask anything about NFRS..."
-        rows={1}
-        disabled={isLoading}
-      />
+        <StyledTextarea
+          ref={textareaRef}
+          value={message}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message..."
+          disabled={isLoading}
+        />
 
-      {message.length > 0 && (message.length > MAX_MESSAGE_LENGTH * 0.8) && (
-        <MessageLengthIndicator
-          isApproachingLimit={isApproachingLimit && !isOverLimit}
-          isOverLimit={isOverLimit}
+        <SendButton
+          type="button"
+          onClick={handleSendMessage}
+          disabled={!message.trim() || isLoading}
+          title="Send message"
         >
-          {message.length}/{MAX_MESSAGE_LENGTH}
-        </MessageLengthIndicator>
-      )}
-
-      <EnhancedSendButton
-        onClick={handleSend}
-        disabled={!message.trim() || isLoading || isOverLimit}
-        aria-label="Send message"
-      >
-        {isLoading ? <LoadingSpinner /> : <IconWrapper Icon={FiSend} size={18} />}
-      </EnhancedSendButton>
-    </EnhancedInputContainer>
+          <IconWrapper Icon={FiSend} size={16} />
+        </SendButton>
+      </InputWrapper>
+    </InputContainer>
   );
 };
 

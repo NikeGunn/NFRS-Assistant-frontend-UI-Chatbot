@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Conversation, Message, DocumentSource } from '../types/api.types';
-import { chatService } from '../services/api.service';
+import { chatService, knowledgeService } from '../services/api.service';
 
 interface ChatContextType {
   conversations: Conversation[];
@@ -9,12 +9,14 @@ interface ChatContextType {
   isLoading: boolean;
   error: string | null;
   language: 'en' | 'ne';
+  typingText: string | null; // Add typing text state for typewriter effect
   setLanguage: (lang: 'en' | 'ne') => void;
   createNewConversation: (title: string) => Promise<number>;
   selectConversation: (id: number) => Promise<void>;
   updateConversation: (id: number, title: string) => Promise<void>;
   deleteConversation: (id: number) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
+  uploadDocument: (file: File) => Promise<void>;
   translateMessage: (text: string, sourceLang: 'en' | 'ne', targetLang: 'en' | 'ne') => Promise<string>;
 }
 
@@ -28,11 +30,11 @@ const MOCK_CONVERSATIONS: Conversation[] = [
 
 const MOCK_MESSAGES: Record<number, Message[]> = {
   1: [
-    { id: '1-1', conversation_id: 1, role: 'user', content: 'What is NFRS 15?', created_at: new Date().toISOString() },
+    { id: '1-1', conversation_id: 1, role: 'user' as const, content: 'What is NFRS 15?', created_at: new Date().toISOString() },
     {
       id: '1-2',
       conversation_id: 1,
-      role: 'assistant',
+      role: 'assistant' as const,
       content: 'NFRS 15 is the Nepal Financial Reporting Standard for Revenue from Contracts with Customers. It establishes a comprehensive framework for determining when and how much revenue to recognize. The standard is based on a core principle that an entity should recognize revenue to depict the transfer of promised goods or services to customers in an amount that reflects the consideration to which the entity expects to be entitled in exchange for those goods or services.',
       created_at: new Date().toISOString(),
       sources: [
@@ -46,12 +48,12 @@ const MOCK_MESSAGES: Record<number, Message[]> = {
     }
   ],
   2: [
-    { id: '2-1', conversation_id: 2, role: 'user', content: 'What are the disclosure requirements under NFRS?', created_at: new Date().toISOString() },
+    { id: '2-1', conversation_id: 2, role: 'user' as const, content: 'What are the disclosure requirements under NFRS?', created_at: new Date().toISOString() },
     {
       id: '2-2',
       conversation_id: 2,
-      role: 'assistant',
-      content: 'NFRS disclosure requirements vary by standard but generally include providing information about the recognition, measurement, presentation and disclosure of financial statement items. Key disclosures typically include accounting policies used, judgments made in applying those policies, assumptions about the future, and details about financial statement line items including their composition and changes during the reporting period.',
+      role: 'assistant' as const,
+      content: 'NFRS disclosure requirements vary by standard but generally include providing information about the recognition, measurement, presentation and disclosure of financial statement items. Key disclosures typically include providing information about the recognition, measurement, presentation and disclosure of financial statement items. Key disclosures typically include accounting policies used, judgments made in applying those policies, assumptions about the future, and details about financial statement line items including their composition and changes during the reporting period.',
       created_at: new Date().toISOString(),
       sources: [
         {
@@ -71,8 +73,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMockMode, setIsMockMode] = useState<boolean>(true); // For testing
+  const [isMockMode, setIsMockMode] = useState<boolean>(false); // Changed from true to false
   const [language, setLanguage] = useState<'en' | 'ne'>('en');
+  const [typingText, setTypingText] = useState<string | null>(null); // Typewriter effect state
 
   // Load conversations
   useEffect(() => {
@@ -101,6 +104,52 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     fetchConversations();
   }, [isMockMode]);
+
+  // Enhanced typewriter effect function with more natural typing patterns
+  const typewriterEffect = (text: string, onComplete: (fullText: string) => void) => {
+    let currentIndex = 0;
+    setTypingText("");
+
+    // Create variable typing speeds for a more natural effect
+    const getTypingDelay = () => {
+      // Occasionally add a longer pause (like a human thinking)
+      if (Math.random() < 0.05) return 250 + Math.random() * 500;
+
+      // Pause slightly longer at punctuation
+      if (currentIndex > 0 && ['.', ',', '!', '?', ':'].includes(text.charAt(currentIndex - 1))) {
+        return 150 + Math.random() * 200;
+      }
+
+      // Occasionally pause briefly between words
+      if (currentIndex > 0 && text.charAt(currentIndex - 1) === ' ') {
+        if (Math.random() < 0.2) return 100 + Math.random() * 100;
+      }
+
+      // Normal typing speed with slight variations
+      return 15 + Math.random() * 25;
+    };
+
+    const typeNextChar = () => {
+      if (currentIndex < text.length) {
+        // Type the next chunk of characters (makes it a bit faster)
+        const chunkSize = Math.random() < 0.8 ? 1 : Math.floor(Math.random() * 3) + 1;
+        const chunk = text.substr(currentIndex, chunkSize);
+
+        setTypingText(prev => prev + chunk);
+        currentIndex += chunk.length;
+
+        // Schedule the next character(s) with variable delay
+        setTimeout(typeNextChar, getTypingDelay());
+      } else {
+        // Typing complete
+        onComplete(text);
+        setTypingText(null);
+      }
+    };
+
+    // Start the typing effect
+    typeNextChar();
+  };
 
   const createNewConversation = async (title: string): Promise<number> => {
     setIsLoading(true);
@@ -273,144 +322,228 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Send a new message
   const sendMessage = async (content: string): Promise<void> => {
     if (!currentConversation) {
-      throw new Error('No active conversation');
+      setError('No active conversation');
+      return;
     }
 
-    // Add user message immediately for responsive UI
-    const tempId = `temp-${Date.now()}`;
-    const userMessage: Message = {
-      id: tempId,
-      conversation_id: currentConversation.id,
-      role: 'user',
-      content,
-      created_at: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setError(null);
 
     try {
+      // Generate a temporary ID for optimistic UI update
+      const tempId = `temp-${Date.now()}`;
+
+      // Add user message to UI immediately
+      const userMessage: Message = {
+        id: tempId,
+        conversation_id: currentConversation.id,
+        role: 'user',
+        content,
+        created_at: new Date().toISOString()
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
       if (isMockMode) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Mock response for testing
+        setTimeout(() => {
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}`,
+            conversation_id: currentConversation.id,
+            role: 'assistant',
+            content: 'This is a mock response from the assistant.',
+            created_at: new Date().toISOString(),
+            sources: [
+              {
+                id: 'mock-source',
+                title: 'Mock Source Document',
+                description: 'This is a mock source document',
+                relevance_score: 0.95
+              }
+            ]
+          };
 
-        // Generate mock response based on the query
-        let responseContent = '';
-        let sources: DocumentSource[] = [];
+          // Use the typewriter effect
+          typewriterEffect(assistantMessage.content, (fullText) => {
+            // Replace with actual message once typing is complete
+            setTypingText(null);
+            setMessages(prev => [...prev.filter(m => m.id !== tempId), {
+              ...userMessage,
+              id: `user-${Date.now()}`
+            }, {
+              ...assistantMessage,
+              content: fullText
+            }]);
+            setIsLoading(false);
+          });
 
-        // Check for specific NFRS related terms
-        if (content.toLowerCase().includes('nfrs 15')) {
-          responseContent = language === 'en'
-            ? 'NFRS 15 establishes principles for reporting information about the nature, amount, timing, and uncertainty of revenue and cash flows arising from contracts with customers. It follows a five-step model for revenue recognition: 1) Identify the contract with the customer, 2) Identify performance obligations, 3) Determine the transaction price, 4) Allocate the transaction price to the performance obligations, and 5) Recognize revenue when each performance obligation is satisfied.'
-            : 'NFRS १५ ले ग्राहकहरूसँगको सम्झौताबाट प्राप्त हुने राजस्व र नगद प्रवाहको प्रकृति, रकम, समय र अनिश्चितताको बारेमा रिपोर्टिङको लागि सिद्धान्तहरू स्थापित गर्दछ। यसले राजस्व पहिचानको लागि पाँच-चरणको मोडेल अनुसरण गर्दछ: १) ग्राहकसँग सम्झौता पहिचान गर्नुहोस्, २) कार्यसम्पादन दायित्वहरू पहिचान गर्नुहोस्, ३) लेनदेन मूल्य निर्धारण गर्नुहोस्, ४) लेनदेन मूल्यलाई कार्यसम्पादन दायित्वहरूमा विनियोजित गर्नुहोस्, र ५) प्रत्येक कार्यसम्पादन दायित्व सन्तुष्ट भएपछि राजस्वको पहिचान गर्नुहोस्।';
-
-          sources = [
-            {
-              id: 'src-' + Date.now(),
-              title: 'NFRS 15 - Revenue Recognition',
-              description: 'Official document for NFRS 15',
-              relevance_score: 0.95
-            }
-          ];
-        } else if (content.toLowerCase().includes('nfrs 9')) {
-          responseContent = language === 'en'
-            ? 'NFRS 9 addresses the accounting for financial instruments. It includes requirements for recognition and measurement, impairment, derecognition and general hedge accounting. The standard introduces an expected credit loss model for impairment that requires timely recognition of expected credit losses.'
-            : 'NFRS ९ ले वित्तीय उपकरणहरूको लेखांकनलाई सम्बोधन गर्दछ। यसमा पहिचान र मापन, क्षीणता, अमान्यता र सामान्य हेज लेखांकनको लागि आवश्यकताहरू समावेश छन्। मानकले क्षीणताको लागि अपेक्षित क्रेडिट नोक्सानी मोडेल प्रस्तुत गर्दछ जसले अपेक्षित क्रेडिट नोक्सानीको समयमै पहिचानको आवश्यकता पर्दछ।';
-
-          sources = [
-            {
-              id: 'src-' + Date.now(),
-              title: 'NFRS 9 - Financial Instruments',
-              description: 'Comprehensive guide to financial instruments',
-              relevance_score: 0.92
-            }
-          ];
-        } else if (content.toLowerCase().includes('nfrs 16')) {
-          responseContent = language === 'en'
-            ? 'NFRS 16 sets out the principles for the recognition, measurement, presentation and disclosure of leases. It requires lessees to recognize most leases on the balance sheet as lease liabilities, with corresponding right-of-use assets. Key disclosure requirements include detailed breakdowns of lease expenses, maturity analysis of lease liabilities, and information about variable lease payments.'
-            : 'NFRS १६ ले लिजको पहिचान, मापन, प्रस्तुति र खुलासाको लागि सिद्धान्तहरू निर्धारित गर्दछ। यसले लिजहरूलाई ब्यालेन्स सिटमा लिज दायित्वहरू र सम्बन्धित प्रयोग-अधिकार सम्पत्तिहरूको रूपमा पहिचान गर्न लिजीहरूलाई आवश्यक पर्दछ। प्रमुख खुलासा आवश्यकताहरूमा लिज खर्चहरूको विस्तृत विवरण, लिज दायित्वहरूको परिपक्वता विश्लेषण, र परिवर्तनीय लिज भुक्तानीहरूको बारेमा जानकारी समावेश छन्।';
-
-          sources = [
-            {
-              id: 'src-' + Date.now(),
-              title: 'NFRS 16 - Leases',
-              description: 'Official lease accounting standard',
-              relevance_score: 0.89
-            }
-          ];
-        } else {
-          // Provide a default response for any input, including simple greetings
-          responseContent = language === 'en'
-            ? `Thank you for your message: "${content}". As the NFRS Assistant, I can help you with questions about Nepal Financial Reporting Standards. For example, you can ask about specific standards like NFRS 15 (Revenue Recognition), NFRS 9 (Financial Instruments), or NFRS 16 (Leases). I can also explain accounting concepts, disclosure requirements, and practical applications of these standards. How can I assist you today with your NFRS-related queries?`
-            : `तपाईंको सन्देशको लागि धन्यवाद: "${content}". NFRS सहायकको रूपमा, म तपाईंलाई नेपाल वित्तीय प्रतिवेदन मानकहरू बारे प्रश्नहरूमा मद्दत गर्न सक्छु। उदाहरणका लागि, तपाईं NFRS 15 (राजस्व मान्यता), NFRS 9 (वित्तीय उपकरणहरू), वा NFRS 16 (लिजहरू) जस्ता विशिष्ट मानकहरू बारे सोध्न सक्नुहुन्छ। म लेखांकन अवधारणाहरू, प्रकटीकरण आवश्यकताहरू, र यी मानकहरूको व्यावहारिक अनुप्रयोगहरू पनि बताउन सक्छु। म तपाईंलाई NFRS-सम्बन्धित प्रश्नहरूमा आज कसरी सहयोग गर्न सक्छु?`;
-
-          sources = [];
-        }
-
-        const assistantMessage: Message = {
-          id: `assistant-msg-${Date.now()}`,
-          conversation_id: currentConversation.id,
-          role: 'assistant',
-          content: responseContent,
-          sources,
-          created_at: new Date().toISOString()
-        };
-
-        // Replace the temporary message and add the assistant message
-        setMessages(prev => [
-          ...prev.filter(m => m.id !== tempId),
-          { ...userMessage, id: `user-msg-${Date.now()}` },
-          assistantMessage
-        ]);
-
-        // Update mock data for persistence
-        MOCK_MESSAGES[currentConversation.id] = [
-          ...(MOCK_MESSAGES[currentConversation.id] || []),
-          { ...userMessage, id: `user-msg-${Date.now()}` },
-          assistantMessage
-        ];
+        }, 1000);
       } else {
+        // Send the actual API request - using both content and message fields as per API requirements
         const response = await chatService.sendMessage({
           conversation_id: currentConversation.id,
           content,
-          language
+          message: content, // Add message field that matches content
+          role: 'user',
+          language: language
         });
 
-        // Replace the temporary message and add the assistant message
-        setMessages(prev => [
-          ...prev.filter(m => m.id !== tempId),
-          {
-            id: `user-msg-${Date.now()}`,
-            conversation_id: currentConversation.id,
-            role: 'user',
-            content,
-            created_at: new Date().toISOString()
-          },
-          {
-            id: response.id,
+        if (response) {
+          // Backend response contains message content directly
+          // Replace the temporary message with a properly formatted user message
+          setMessages(prev =>
+            prev.map(msg => msg.id === tempId ? {
+              ...msg,
+              id: `user-${Date.now()}` // Since backend might not return ID for user message
+            } : msg)
+          );
+
+          // Format the assistant's response as a Message
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}`,
             conversation_id: currentConversation.id,
             role: 'assistant',
-            content: response.content,
-            sources: response.sources,
-            created_at: response.created_at || new Date().toISOString()
-          }
-        ]);
+            content: (response as any).message || response.content, // Type assertion for message property
+            created_at: new Date().toISOString(),
+            sources: response.sources ? response.sources.map(source => ({
+              id: source.id.toString(),
+              title: source.title,
+              description: source.title, // Use title as description if not available
+              relevance_score: 1.0
+            })) : undefined
+          };
+
+          // Use the typewriter effect
+          typewriterEffect(assistantMessage.content, (fullText) => {
+            // Replace with actual message once typing is complete
+            setTypingText(null);
+            setMessages(prev => [...prev.filter(m => m.id !== tempId), {
+              ...userMessage,
+              id: `user-${Date.now()}`
+            }, {
+              ...assistantMessage,
+              content: fullText
+            }]);
+            setIsLoading(false);
+          });
+        }
       }
     } catch (error: any) {
-      // Keep the user message but mark it as error
-      setMessages(prev => [
-        ...prev.filter(m => m.id !== tempId),
-        { ...userMessage, id: `user-msg-${Date.now()}` }
-      ]);
-
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
         'Failed to send message';
       setError(errorMessage);
       console.error('Error sending message:', error);
+
+      // Remove the temporary message if there was an error
+      setMessages(prev => prev.filter(msg => msg.id !== `temp-${Date.now()}`));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Simulate a response for demo mode
+  const simulateResponse = async (userMessage: string, tempId: string) => {
+    // Replace the temporary message with a "real" one (in a real app, this would come from the server)
+    const realUserMessage: Message = {
+      id: Math.random().toString(36).substring(2, 15),
+      conversation_id: currentConversation!.id,
+      role: 'user' as const,
+      content: userMessage,
+      created_at: new Date().toISOString()
+    };
+
+    // Replace the temporary message with the real one
+    setMessages(prev =>
+      prev.map(msg => msg.id === tempId ? realUserMessage : msg)
+    );
+
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Create mock response based on user message
+    let responseContent = "I don't have a specific response for that.";
+
+    if (userMessage.toLowerCase().includes("hello") || userMessage.toLowerCase().includes("hi")) {
+      responseContent = "Hello! How can I assist you today?";
+    } else if (userMessage.toLowerCase().includes("weather")) {
+      responseContent = "I don't have access to real-time weather data, but I'd be happy to discuss weather patterns or climate in general.";
+    } else if (userMessage.toLowerCase().includes("name")) {
+      responseContent = "I'm Neural, your friendly AI assistant.";
+    } else if (userMessage.toLowerCase().includes("help")) {
+      responseContent = "I'm here to help! You can ask me questions, have a conversation, or request information on various topics.";
+    }
+
+    // Add the assistant's response
+    const assistantMessage: Message = {
+      id: Math.random().toString(36).substring(2, 15),
+      conversation_id: currentConversation!.id,
+      role: 'assistant' as const,
+      content: responseContent,
+      created_at: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+  };
+
+  const uploadDocument = async (file: File): Promise<void> => {
+    if (!currentConversation) {
+      throw new Error('No active conversation');
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Create a FormData object to send the file
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('conversation_id', currentConversation.id.toString());
+
+      if (isMockMode) {
+        // Mock document upload
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Create a temporary message to show the document was uploaded
+        const tempMessage: Message = {
+          id: `doc-upload-${Date.now()}`,
+          conversation_id: currentConversation.id,
+          role: 'user' as const,
+          content: `Uploaded document: ${file.name}`,
+          created_at: new Date().toISOString()
+        };
+
+        setMessages(prev => [...prev, tempMessage]);
+
+        // Add to mock messages
+        MOCK_MESSAGES[currentConversation.id] = [
+          ...(MOCK_MESSAGES[currentConversation.id] || []),
+          tempMessage
+        ];
+      } else {
+        // Actual document upload using the API service
+        const document = await knowledgeService.uploadDocument(formData);
+
+        // Add a user message indicating document upload
+        const userMessage: Message = {
+          id: `user-doc-${Date.now()}`,
+          conversation_id: currentConversation.id,
+          role: 'user' as const,
+          content: `Uploaded document: ${document.title || file.name}`,
+          created_at: new Date().toISOString()
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+      }
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to upload document';
+      setError(errorMessage);
+      console.error('Error uploading document:', error);
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -464,12 +597,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isLoading,
       error,
       language,
+      typingText, // Add typing text to context
       setLanguage,
       createNewConversation,
       selectConversation,
       updateConversation,
       deleteConversation,
       sendMessage,
+      uploadDocument,
       translateMessage
     }}>
       {children}

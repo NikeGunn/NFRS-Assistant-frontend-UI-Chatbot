@@ -391,7 +391,8 @@ const ChatPage: React.FC = () => {
     selectConversation,
     updateConversation,
     deleteConversation,
-    sendMessage
+    sendMessage,
+    uploadDocument
   } = useChat();
   const { user, logout } = useAuth();
 
@@ -646,6 +647,7 @@ const ChatPage: React.FC = () => {
             }}>
               <ChatInput
                 onSendMessage={handleSendMessage}
+                onFileUpload={uploadDocument}
                 isLoading={isLoading}
               />
             </div>
@@ -685,6 +687,7 @@ const ChatPage: React.FC = () => {
             <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
               <ChatInput
                 onSendMessage={handleSendMessage}
+                onFileUpload={uploadDocument}
                 isLoading={isLoading}
               />
             </div>

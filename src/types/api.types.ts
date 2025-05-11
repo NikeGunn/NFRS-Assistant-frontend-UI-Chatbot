@@ -183,7 +183,9 @@ export interface UpdateConversationRequest {
 export interface SendMessageRequest {
   conversation_id: number;
   content: string;
-  language: 'en' | 'ne';
+  message: string;  // Adding this field to match backend API expectations
+  role: 'user' | 'assistant';
+  language?: 'en' | 'ne';
 }
 
 export interface TranslationRequest {
