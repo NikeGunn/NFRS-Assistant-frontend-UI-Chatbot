@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FiMenu, FiSend, FiPlus, FiUser, FiMessageSquare, FiLogOut, FiChevronDown } from 'react-icons/fi';
+import { FiMenu, FiSend, FiPlus, FiUser, FiMessageSquare, FiLogOut, FiChevronDown, FiEdit, FiTrash2 } from 'react-icons/fi';
 import {
   Container,
   MainContent,
@@ -200,6 +200,70 @@ const ChatHeader = styled.div`
   justify-content: space-between;
 `;
 
+const ChatTitle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .edit-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 10px;
+  }
+
+  .action-button {
+    background: transparent;
+    border: none;
+    color: #6e6e80;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+
+    &:hover {
+      background-color: #f7f7f8;
+      color: #10A37F;
+    }
+  }
+`;
+
+const TitleInput = styled.input`
+  font-size: 1rem;
+  padding: 4px 8px;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  margin-right: 8px;
+  width: 250px;
+`;
+
+const ErrorMessage = styled.div`
+  color: #e34c4c;
+  background-color: rgba(227, 76, 76, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  button {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background-color: #10A37F;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #0c8a6b;
+    }
+  }
+`;
+
 const UserMenu = styled.div<{ isOpen: boolean }>`
   position: absolute;
   top: 100%;
@@ -247,25 +311,100 @@ const UserMenuContainer = styled.div`
   position: relative;
 `;
 
+const DeleteConfirmation = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const ConfirmationModal = styled.div`
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #202123;
+  }
+
+  p {
+    margin-bottom: 24px;
+    color: #6e6e80;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+
+    button {
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-weight: 500;
+      cursor: pointer;
+
+      &.cancel {
+        background-color: white;
+        border: 1px solid #e5e5e5;
+        color: #6e6e80;
+
+        &:hover {
+          background-color: #f7f7f8;
+        }
+      }
+
+      &.delete {
+        background-color: #e34c4c;
+        border: none;
+        color: white;
+
+        &:hover {
+          background-color: #d43e3e;
+        }
+      }
+    }
+  }
+`;
+
 const ChatPage: React.FC = () => {
-  const { sessionId } = useParams<{ sessionId: string }>();
+  const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
   const {
     messages,
-    currentSession,
+    conversations,
+    currentConversation,
     isLoading,
+    error,
     language,
     setLanguage,
-    createNewSession,
-    selectSession,
+    createNewConversation,
+    selectConversation,
+    updateConversation,
+    deleteConversation,
     sendMessage
   } = useChat();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [lastResponseSources, setLastResponseSources] = useState<any[] | undefined>(undefined);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Title editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+
+  // Delete confirmation
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   // Sample suggestions for empty state
   const suggestions = [
@@ -279,13 +418,24 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     const initializeChat = async () => {
-      if (sessionId) {
-        await selectSession(sessionId);
+      if (conversationId) {
+        try {
+          await selectConversation(Number(conversationId));
+          setTitleInput(currentConversation?.title || '');
+        } catch (error) {
+          console.error('Error selecting conversation:', error);
+        }
       }
     };
 
     initializeChat();
-  }, [sessionId, selectSession]);
+  }, [conversationId, selectConversation]);
+
+  useEffect(() => {
+    if (currentConversation) {
+      setTitleInput(currentConversation.title);
+    }
+  }, [currentConversation]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -302,28 +452,21 @@ const ChatPage: React.FC = () => {
 
   const handleSendMessage = async (content: string) => {
     try {
-      if (!currentSession) {
-        const newSessionId = await createNewSession(`Chat about ${content.substring(0, 20)}...`);
-        navigate(`/chat/${newSessionId}`, { replace: true });
+      if (!currentConversation) {
+        const title = content.length > 30
+          ? `${content.substring(0, 30)}...`
+          : content;
+
+        const newConversationId = await createNewConversation(title);
+        navigate(`/chat/${newConversationId}`, { replace: true });
+
+        // Wait a short time for the conversation to be created and selected
+        setTimeout(() => {
+          sendMessage(content);
+        }, 100);
+      } else {
+        await sendMessage(content);
       }
-
-      await sendMessage(content, true);
-
-      // For demo purposes, we're setting mock sources
-      setLastResponseSources([
-        {
-          id: "1",
-          title: "NFRS 15 - Revenue Recognition",
-          description: "Official document for NFRS 15",
-          category: "Revenue Standards"
-        },
-        {
-          id: "2",
-          title: "NFRS Implementation Guide",
-          description: "Implementation guidance for NFRS standards",
-          category: "Guidelines"
-        }
-      ]);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -344,6 +487,54 @@ const ChatPage: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleEditTitle = () => {
+    setIsEditingTitle(true);
+  };
+
+  const handleSaveTitle = async () => {
+    if (currentConversation && titleInput.trim() !== currentConversation.title) {
+      try {
+        await updateConversation(currentConversation.id, titleInput.trim());
+        setIsEditingTitle(false);
+      } catch (error) {
+        console.error('Error updating conversation title:', error);
+      }
+    } else {
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (currentConversation) {
+      try {
+        await deleteConversation(currentConversation.id);
+        setShowDeleteConfirmation(false);
+        navigate('/chat');
+      } catch (error) {
+        console.error('Error deleting conversation:', error);
+      }
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirmation(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSaveTitle();
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false);
+      if (currentConversation) {
+        setTitleInput(currentConversation.title);
+      }
+    }
   };
 
   return (
@@ -389,7 +580,7 @@ const ChatPage: React.FC = () => {
                   <IconWrapper Icon={FiUser} size={16} />
                 </div>
                 <div className="name">
-                  User
+                  {user?.username || 'User'}
                 </div>
                 <IconWrapper Icon={FiChevronDown} size={16} />
               </UserProfile>
@@ -408,7 +599,14 @@ const ChatPage: React.FC = () => {
           </HeaderControls>
         </EnhancedHeader>
 
-        {messages.length === 0 ? (
+        {error && (
+          <ErrorMessage>
+            {error}
+            <button onClick={() => window.location.reload()}>Retry</button>
+          </ErrorMessage>
+        )}
+
+        {!error && messages.length === 0 && !currentConversation ? (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -455,9 +653,35 @@ const ChatPage: React.FC = () => {
         ) : (
           <EnhancedChatContainer>
             <ChatHeader>
-              {currentSession?.title || 'New Conversation'}
+              <ChatTitle>
+                {isEditingTitle ? (
+                  <>
+                    <TitleInput
+                      value={titleInput}
+                      onChange={(e) => setTitleInput(e.target.value)}
+                      onBlur={handleSaveTitle}
+                      onKeyDown={handleTitleKeyDown}
+                      autoFocus
+                    />
+                  </>
+                ) : (
+                  <>
+                    {currentConversation?.title || 'New Conversation'}
+                    <div className="edit-actions">
+                      <button className="action-button" onClick={handleEditTitle}>
+                        <IconWrapper Icon={FiEdit} size={16} />
+                      </button>
+                      <button className="action-button" onClick={handleDeleteClick}>
+                        <IconWrapper Icon={FiTrash2} size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </ChatTitle>
             </ChatHeader>
-            <MessageList messages={messages} sources={lastResponseSources} />
+
+            <MessageList messages={messages} />
+
             <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
               <ChatInput
                 onSendMessage={handleSendMessage}
@@ -467,6 +691,19 @@ const ChatPage: React.FC = () => {
           </EnhancedChatContainer>
         )}
       </MainContent>
+
+      {showDeleteConfirmation && (
+        <DeleteConfirmation>
+          <ConfirmationModal>
+            <h3>Delete Conversation</h3>
+            <p>Are you sure you want to delete this conversation? This action cannot be undone.</p>
+            <div className="actions">
+              <button className="cancel" onClick={handleDeleteCancel}>Cancel</button>
+              <button className="delete" onClick={handleDeleteConfirm}>Delete</button>
+            </div>
+          </ConfirmationModal>
+        </DeleteConfirmation>
+      )}
     </EnhancedContainer>
   );
 };

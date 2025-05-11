@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { FcGoogle } from 'react-icons/fc';
 import { FaFacebook } from 'react-icons/fa';
-import { FiAtSign, FiLock, FiEye, FiEyeOff, FiCheckCircle, FiBook, FiHelpCircle, FiFileText } from 'react-icons/fi';
+import { FiAtSign, FiLock, FiEye, FiEyeOff, FiMail, FiCheck, FiBook, FiHelpCircle, FiFileText } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import IconWrapper from '../../components/IconWrapper';
+import { RegisterRequest } from '../../types/api.types';
 
 // OpenAI-inspired styled components with perfect vertical alignment
 const PageContainer = styled.div`
@@ -214,10 +215,10 @@ const Divider = styled.div`
   }
 `;
 
-const SocialButton = styled.button<{ bgColor: string }>`
+const SocialButton = styled.button<{ $bgColor: string }>`
   width: 100%;
   padding: 0.75rem 1rem;
-  background-color: ${props => props.bgColor};
+  background-color: ${props => props.$bgColor};
   color: white;
   border: none;
   border-radius: 8px;
@@ -407,21 +408,95 @@ const BulletPoint = styled.li`
   }
 `;
 
+const TabsContainer = styled.div`
+  display: flex;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #e5e5e5;
+`;
+
+const Tab = styled.div<{ $active: boolean }>`
+  flex: 1;
+  text-align: center;
+  padding: 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: ${props => props.$active ? '600' : '500'};
+  color: ${props => props.$active ? '#10A37F' : '#6e6e80'};
+  border-bottom: ${props => props.$active ? '2px solid #10A37F' : 'none'};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: ${props => props.$active ? '#10A37F' : '#202123'};
+  }
+`;
+
+const PasswordRequirements = styled.div`
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #6e6e80;
+`;
+
+const RequirementItem = styled.div<{ $met: boolean }>`
+  display: flex;
+  align-items: center;
+  margin-top: 0.25rem;
+  color: ${props => props.$met ? '#10A37F' : '#6e6e80'};
+
+  svg {
+    margin-right: 0.25rem;
+  }
+`;
+
+const LanguageSelector = styled.div`
+  margin-bottom: 1.25rem;
+`;
+
+const LanguageOption = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
+  gap: 1rem;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #202123;
+  }
+`;
+
 const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  // Tabs state
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+
+  // Login state
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+
+  // Registration state
+  const [registerUsername, setRegisterUsername] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerPassword2, setRegisterPassword2] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState<'en' | 'ne'>('en');
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterPassword2, setShowRegisterPassword2] = useState(false);
+
+  // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    if (!username.trim() || !password.trim()) {
+    if (!loginUsername.trim() || !loginPassword.trim()) {
       setErrorMessage('Username and password are required');
       return;
     }
@@ -429,27 +504,70 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(username, password);
+      await login(loginUsername, loginPassword);
       navigate('/chat');
     } catch (error: any) {
-      setErrorMessage(error?.response?.data?.detail || 'Login failed. Please check your credentials.');
+      setErrorMessage(error?.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    // Basic validation
+    if (!registerUsername.trim() || !registerEmail.trim() || !registerPassword.trim() || !registerPassword2.trim()) {
+      setErrorMessage('All fields are required');
+      return;
+    }
+
+    if (registerPassword !== registerPassword2) {
+      setErrorMessage('Passwords do not match');
+      return;
+    }
+
+    if (registerPassword.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const userData: RegisterRequest = {
+        username: registerUsername,
+        email: registerEmail,
+        password: registerPassword,
+        password2: registerPassword2,
+        preferred_language: preferredLanguage
+      };
+
+      await register(userData);
+      navigate('/chat');
+    } catch (error: any) {
+      const errorMsg = error?.message || 'Registration failed. Please try again.';
+      setErrorMessage(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Password requirements validation
+  const passwordHasMinLength = registerPassword.length >= 8;
+  const passwordHasLetter = /[a-zA-Z]/.test(registerPassword);
+  const passwordHasNumber = /\d/.test(registerPassword);
+  const passwordHasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(registerPassword);
+  const passwordsMatch = registerPassword === registerPassword2 && registerPassword.length > 0;
+
+  // Social login handlers (placeholder)
   const handleGoogleLogin = () => {
-    // Placeholder for Google login functionality
     alert('Google login functionality would be implemented here');
   };
 
   const handleFacebookLogin = () => {
-    // Placeholder for Facebook login functionality
     alert('Facebook login functionality would be implemented here');
-  };
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
   };
 
   return (
@@ -461,79 +579,247 @@ const LoginPage: React.FC = () => {
         </LogoContainer>
 
         <FormCard>
-          <FormTitle>Sign in to your account</FormTitle>
-          <FormSubtitle>Access NFRS standards and get intelligent assistance</FormSubtitle>
+          <TabsContainer>
+            <Tab
+              $active={activeTab === 'login'}
+              onClick={() => setActiveTab('login')}
+            >
+              Sign In
+            </Tab>
+            <Tab
+              $active={activeTab === 'register'}
+              onClick={() => setActiveTab('register')}
+            >
+              Register
+            </Tab>
+          </TabsContainer>
 
-          <TestLoginInfo>
-            <TestLoginInfoTitle>Test Credentials</TestLoginInfoTitle>
-            <TestLoginInfoText>Username: <strong>martas</strong></TestLoginInfoText>
-            <TestLoginInfoText>Password: <strong>martas@123</strong></TestLoginInfoText>
-          </TestLoginInfo>
+          {activeTab === 'login' ? (
+            <>
+              <FormTitle>Sign in to your account</FormTitle>
+              <FormSubtitle>Access NFRS standards and get intelligent assistance</FormSubtitle>
 
-          <GoogleButton bgColor="#ffffff" onClick={handleGoogleLogin}>
-            <IconWrapper Icon={FcGoogle} size={20} /> Continue with Google
-          </GoogleButton>
+              <TestLoginInfo>
+                <TestLoginInfoTitle>Test Credentials</TestLoginInfoTitle>
+                <TestLoginInfoText>Username: <strong>martas</strong></TestLoginInfoText>
+                <TestLoginInfoText>Password: <strong>martas@123</strong></TestLoginInfoText>
+              </TestLoginInfo>
 
-          <SocialButton bgColor="#1877F2" onClick={handleFacebookLogin}>
-            <IconWrapper Icon={FaFacebook} size={20} /> Continue with Facebook
-          </SocialButton>
+              <GoogleButton $bgColor="#ffffff" onClick={handleGoogleLogin}>
+                <IconWrapper Icon={FcGoogle} size={20} /> Continue with Google
+              </GoogleButton>
 
-          <Divider><span>OR</span></Divider>
+              <SocialButton $bgColor="#1877F2" onClick={handleFacebookLogin}>
+                <IconWrapper Icon={FaFacebook} size={20} /> Continue with Facebook
+              </SocialButton>
 
-          <form onSubmit={handleSubmit}>
-            <FormGroup>
-              <Label htmlFor="username">Username</Label>
-              <InputContainer>
-                <InputIcon>
-                  <IconWrapper Icon={FiAtSign} size={18} />
-                </InputIcon>
-                <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="Enter your username"
-                  required
-                />
-              </InputContainer>
-            </FormGroup>
+              <Divider><span>OR</span></Divider>
 
-            <FormGroup>
-              <Label htmlFor="password">Password</Label>
-              <InputContainer>
-                <InputIcon>
-                  <IconWrapper Icon={FiLock} size={18} />
-                </InputIcon>
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="Enter your password"
-                  required
-                />
-                <PasswordToggle onClick={togglePasswordVisibility}>
-                  <IconWrapper Icon={showPassword ? FiEyeOff : FiEye} size={18} />
-                </PasswordToggle>
-              </InputContainer>
-            </FormGroup>
+              <form onSubmit={handleLoginSubmit}>
+                <FormGroup>
+                  <Label htmlFor="username">Username</Label>
+                  <InputContainer>
+                    <InputIcon>
+                      <IconWrapper Icon={FiAtSign} size={18} />
+                    </InputIcon>
+                    <Input
+                      id="username"
+                      type="text"
+                      value={loginUsername}
+                      onChange={(e) => setLoginUsername(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Enter your username"
+                      required
+                    />
+                  </InputContainer>
+                </FormGroup>
 
-            {errorMessage && (
-              <ErrorMessage>
-                {errorMessage}
-              </ErrorMessage>
-            )}
+                <FormGroup>
+                  <Label htmlFor="password">Password</Label>
+                  <InputContainer>
+                    <InputIcon>
+                      <IconWrapper Icon={FiLock} size={18} />
+                    </InputIcon>
+                    <Input
+                      id="password"
+                      type={showLoginPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <PasswordToggle onClick={() => setShowLoginPassword(!showLoginPassword)}>
+                      <IconWrapper Icon={showLoginPassword ? FiEyeOff : FiEye} size={18} />
+                    </PasswordToggle>
+                  </InputContainer>
+                </FormGroup>
 
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </Button>
-          </form>
+                {errorMessage && (
+                  <ErrorMessage>
+                    {errorMessage}
+                  </ErrorMessage>
+                )}
 
-          <SignupPrompt>
-            Don't have an account?<a href="#signup">Sign up</a>
-          </SignupPrompt>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? 'Signing in...' : 'Sign in'}
+                </Button>
+              </form>
+
+              <SignupPrompt>
+                Don't have an account? <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab('register'); }}>Register now</a>
+              </SignupPrompt>
+            </>
+          ) : (
+            <>
+              <FormTitle>Create a new account</FormTitle>
+              <FormSubtitle>Join NFRS Assistant to get intelligent assistance on accounting standards</FormSubtitle>
+
+              <form onSubmit={handleRegisterSubmit}>
+                <FormGroup>
+                  <Label htmlFor="register-username">Username</Label>
+                  <InputContainer>
+                    <InputIcon>
+                      <IconWrapper Icon={FiAtSign} size={18} />
+                    </InputIcon>
+                    <Input
+                      id="register-username"
+                      type="text"
+                      value={registerUsername}
+                      onChange={(e) => setRegisterUsername(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Choose a username"
+                      required
+                    />
+                  </InputContainer>
+                </FormGroup>
+
+                <FormGroup>
+                  <Label htmlFor="register-email">Email</Label>
+                  <InputContainer>
+                    <InputIcon>
+                      <IconWrapper Icon={FiMail} size={18} />
+                    </InputIcon>
+                    <Input
+                      id="register-email"
+                      type="email"
+                      value={registerEmail}
+                      onChange={(e) => setRegisterEmail(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </InputContainer>
+                </FormGroup>
+
+                <FormGroup>
+                  <Label htmlFor="register-password">Password</Label>
+                  <InputContainer>
+                    <InputIcon>
+                      <IconWrapper Icon={FiLock} size={18} />
+                    </InputIcon>
+                    <Input
+                      id="register-password"
+                      type={showRegisterPassword ? "text" : "password"}
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Create a password"
+                      required
+                    />
+                    <PasswordToggle onClick={() => setShowRegisterPassword(!showRegisterPassword)}>
+                      <IconWrapper Icon={showRegisterPassword ? FiEyeOff : FiEye} size={18} />
+                    </PasswordToggle>
+                  </InputContainer>
+
+                  <PasswordRequirements>
+                    <RequirementItem $met={passwordHasMinLength}>
+                      <IconWrapper Icon={FiCheck} size={14} /> At least 8 characters
+                    </RequirementItem>
+                    <RequirementItem $met={passwordHasLetter}>
+                      <IconWrapper Icon={FiCheck} size={14} /> At least one letter
+                    </RequirementItem>
+                    <RequirementItem $met={passwordHasNumber}>
+                      <IconWrapper Icon={FiCheck} size={14} /> At least one number
+                    </RequirementItem>
+                    <RequirementItem $met={passwordHasSpecial}>
+                      <IconWrapper Icon={FiCheck} size={14} /> At least one special character
+                    </RequirementItem>
+                  </PasswordRequirements>
+                </FormGroup>
+
+                <FormGroup>
+                  <Label htmlFor="register-password2">Confirm Password</Label>
+                  <InputContainer>
+                    <InputIcon>
+                      <IconWrapper Icon={FiLock} size={18} />
+                    </InputIcon>
+                    <Input
+                      id="register-password2"
+                      type={showRegisterPassword2 ? "text" : "password"}
+                      value={registerPassword2}
+                      onChange={(e) => setRegisterPassword2(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Confirm your password"
+                      required
+                    />
+                    <PasswordToggle onClick={() => setShowRegisterPassword2(!showRegisterPassword2)}>
+                      <IconWrapper Icon={showRegisterPassword2 ? FiEyeOff : FiEye} size={18} />
+                    </PasswordToggle>
+                  </InputContainer>
+
+                  {registerPassword2 && (
+                    <RequirementItem $met={passwordsMatch} style={{ marginTop: '0.5rem' }}>
+                      <IconWrapper Icon={FiCheck} size={14} /> Passwords match
+                    </RequirementItem>
+                  )}
+                </FormGroup>
+
+                <LanguageSelector>
+                  <Label>Preferred Language</Label>
+                  <LanguageOption>
+                    <label>
+                      <input
+                        type="radio"
+                        name="language"
+                        value="en"
+                        checked={preferredLanguage === 'en'}
+                        onChange={() => setPreferredLanguage('en')}
+                      />
+                      English
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="language"
+                        value="ne"
+                        checked={preferredLanguage === 'ne'}
+                        onChange={() => setPreferredLanguage('ne')}
+                      />
+                      नेपाली
+                    </label>
+                  </LanguageOption>
+                </LanguageSelector>
+
+                {errorMessage && (
+                  <ErrorMessage>
+                    {errorMessage}
+                  </ErrorMessage>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !passwordHasMinLength || !passwordHasLetter || !passwordHasNumber || !passwordsMatch}
+                >
+                  {isLoading ? 'Creating account...' : 'Create account'}
+                </Button>
+              </form>
+
+              <SignupPrompt>
+                Already have an account? <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab('login'); }}>Sign in</a>
+              </SignupPrompt>
+            </>
+          )}
         </FormCard>
       </ContentContainer>
 
