@@ -133,6 +133,7 @@ const EnhancedEmptyChat = styled(EmptyChat)`
   margin: 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   padding: 3rem 2rem;
+  padding-bottom: calc(3rem + 80px); /* Additional padding at bottom for fixed input */
 
   h2 {
     color: #10A37F;
@@ -182,6 +183,7 @@ const EnhancedChatContainer = styled(ChatContainer)`
   display: flex;
   flex-direction: column;
   height: calc(100vh - 80px);
+  padding-bottom: 70px; /* Add padding to account for fixed input */
 
   @media (max-width: 768px) {
     margin: 0.5rem;
@@ -373,6 +375,60 @@ const ConfirmationModal = styled.div`
         }
       }
     }
+  }
+`;
+
+const SuggestionCard = styled.div`
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  text-align: left;
+  transition: all 0.2s;
+  background-color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-size: 1rem;
+  font-weight: 400;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  height: 80px;
+
+  &:hover {
+    border-color: #10A37F;
+  }
+
+  .suggestion-content {
+    flex: 1;
+    color: #444;
+    line-height: 1.5;
+  }
+
+  .suggestion-icon {
+    color: #10A37F;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 12px;
+  }
+`;
+
+const DisclaimerContainer = styled.div`
+  position: fixed;
+  bottom: 5px;
+  left: 260px;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6e6e80;
+  padding: 5px 0;
+  background-color: white;
+  z-index: 10; /* Increased z-index to ensure this shows above ChatInput disclaimer */
+  border-top: none;
+
+  @media (max-width: 768px) {
+    left: 0;
   }
 `;
 
@@ -623,60 +679,50 @@ const ChatPage: React.FC = () => {
         {!error && messages.length === 0 && !currentConversation ? (
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
-            height: 'calc(100vh - 80px)',
-            position: 'relative'
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'absolute',
+            left: '260px', // Start after sidebar
+            right: 0,
+            top: '80px', // Start after header
+            bottom: '100px', // Space for the input box
+            background: '#fff',
           }}>
-            <EnhancedEmptyChat style={{
-              flex: 1,
-              overflow: 'auto',
-              marginBottom: '90px',
-              paddingBottom: '20px'
-            }}>
-              <h2>Welcome to NFRS Assistant</h2>
-              <p>Hello {user?.username || 'there'}! I'm your intelligent companion for navigating Nepal Financial Reporting Standards. Type a message below to start a conversation.</p>
-
-              <div style={{
-                marginTop: '30px',
-                textAlign: 'center',
-                color: '#6e6e80'
-              }}>
-                <p>You can ask questions about:</p>
-                <ul style={{
-                  listStyle: 'none',
-                  padding: 0,
-                  margin: '20px 0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                  alignItems: 'center'
-                }}>
-                  <li>• NFRS standards and implementation</li>
-                  <li>• Financial reporting requirements</li>
-                  <li>• Accounting treatments and disclosures</li>
-                  <li>• Comparative analysis with IFRS</li>
-                  <li>• Best practices for compliance</li>
-                </ul>
-              </div>
-            </EnhancedEmptyChat>
-
+            {/* Cards container */}
             <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              padding: '1rem',
-              backgroundColor: 'white',
-              borderTop: '1px solid rgba(0, 0, 0, 0.05)',
-              boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.05)',
-              zIndex: 10
+              width: '100%',
+              maxWidth: '720px', // Width adjusted to match screenshot
+              padding: '0 20px',
             }}>
-              <ChatInput
-                onSendMessage={handleSendMessage}
-                onFileUpload={uploadDocument}
-                isLoading={isLoading}
-              />
+              <div style={{
+                width: '100%',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                columnGap: '24px',
+                rowGap: '16px',
+              }}>
+                {suggestions.map((suggestion, index) => (
+                  <SuggestionCard
+                    key={index}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                  >
+                    <div className="suggestion-content">
+                      {suggestion}
+                    </div>
+                    <div className="suggestion-icon">
+                      <IconWrapper Icon={FiSend} size={16} />
+                    </div>
+                  </SuggestionCard>
+                ))}
+              </div>
             </div>
+
+            {/* Input box - fixed at bottom */}
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              onFileUpload={uploadDocument}
+              isLoading={isLoading}
+            />
           </div>
         ) : (
           <EnhancedChatContainer>
@@ -702,13 +748,11 @@ const ChatPage: React.FC = () => {
 
             <MessageList messages={messages} />
 
-            <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
-              <ChatInput
-                onSendMessage={handleSendMessage}
-                onFileUpload={uploadDocument}
-                isLoading={isLoading}
-              />
-            </div>
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              onFileUpload={uploadDocument}
+              isLoading={isLoading}
+            />
           </EnhancedChatContainer>
         )}
       </MainContent>
@@ -725,6 +769,10 @@ const ChatPage: React.FC = () => {
           </ConfirmationModal>
         </DeleteConfirmation>
       )}
+
+      <DisclaimerContainer>
+        Disclaimer: The information provided by NFRS Assistant is for general informational purposes only and is not a substitute for professional advice.
+      </DisclaimerContainer>
     </EnhancedContainer>
   );
 };

@@ -1,6 +1,6 @@
 // This file is a module
-import React, { useState, useRef, ChangeEvent, KeyboardEvent } from 'react';
-import { FiPaperclip, FiSend } from 'react-icons/fi';
+import React, { useState, useRef, ChangeEvent, KeyboardEvent, useEffect } from 'react';
+import { FiPaperclip, FiSend, FiMic, FiSmile } from 'react-icons/fi';
 import styled from 'styled-components';
 import IconWrapper from './IconWrapper';
 // Empty export to ensure file is treated as a module
@@ -14,66 +14,68 @@ interface ChatInputProps {
 
 const InputContainer = styled.div`
   display: flex;
-  align-items: center;
-  padding: 1.15rem 25%; /* Match MessageList padding */
-  background-color: transparent;
-  border-top: 1px solid #e1e4e8;
-  position: sticky;
-  bottom: 0;
+  justify-content: center;
+  width: calc(100% - 260px); /* Subtract the width of the sidebar */
+  padding: 16px 0;
+  background-color: white;
+  border-top: none; /* Removed the top border */
+  position: fixed;
+  bottom: 30px; /* Increased to make room for disclaimer */
+  left: 260px; /* Position after the sidebar */
+  right: 0;
   z-index: 10;
+  box-shadow: none; /* Removed box shadow */
 
-  /* Responsive adjustments to match MessageList */
-  @media (max-width: 1400px) {
-    padding: 0.8rem 20%;
-  }
-
-  @media (max-width: 1200px) {
-    padding: 0.8rem 15%;
-  }
-
-  @media (max-width: 1024px) {
-    padding: 0.8rem 10%;
-  }
-
+  /* Responsive handling for mobile view */
   @media (max-width: 768px) {
-    padding: 0.8rem 5%;
+    width: 100%;
+    left: 0;
   }
 `;
 
 const InputWrapper = styled.div`
   display: flex;
   align-items: center;
-  width: 100%;
-  background-color: #fff; /* White background like ChatGPT */
-  border-radius: 35px;
-  padding: 18px 10px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); /* Enhanced subtle shadow like ChatGPT */
+  width: 85%;
+  max-width: 768px;
+  background-color: white;
+  border-radius: 24px;
+  padding: 10px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   border: 1px solid #e5e5e5;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  margin: 0 auto;
+
+  &:focus-within {
+    border-color: #10A37F;
+    box-shadow: 0 2px 12px rgba(16, 163, 127, 0.15);
+  }
+
+  @media (max-width: 1200px) {
+    width: 90%;
+  }
+
+  @media (max-width: 768px) {
+    width: 95%;
+  }
 `;
 
 const StyledTextarea = styled.textarea`
   flex: 1;
-  min-height: 45px; /* Minimum height */
+  height: 24px;
+  min-height: 24px;
   max-height: 150px;
-  padding: 8px 10px;
+  padding: 8px;
   border: none;
-  border-radius: 8px;
   resize: none;
   outline: none;
-  font-size: 1rem;
+  font-size: 15px;
   line-height: 1.5;
   background-color: transparent;
   font-family: inherit;
-  overflow-y: auto;
 
-  /* Ensure vertical alignment of placeholder */
   &::placeholder {
-    color: #8e8ea0;
-    line-height: 24px; /* Vertically center placeholder */
-  }
-
-  &:focus {
-    box-shadow: none;
+    color: #a0aec0;
   }
 `;
 
@@ -81,18 +83,18 @@ const ActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px; /* Slightly larger button */
+  width: 36px;
   height: 36px;
-  margin-left: 4px;
   border: none;
-  border-radius: 8px; /* Slightly less rounded, more like ChatGPT */
+  border-radius: 50%;
   background-color: transparent;
-  color: #6e6e80;
+  color: #a0aec0;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
+  transition: all 0.2s;
+  margin: 0 2px;
 
   &:hover {
-    background-color: rgba(16, 163, 127, 0.1);
+    background-color: #f3f4f6;
     color: #10A37F;
   }
 
@@ -102,18 +104,64 @@ const ActionButton = styled.button`
   }
 `;
 
-const SendButton = styled(ActionButton)`
-  color: white;
-  background-color: ${props => props.disabled ? '#8e8ea0' : '#10A37F'};
+const SendButton = styled(ActionButton) <{ active: boolean }>`
+  color: ${props => props.active ? 'white' : '#a0aec0'};
+  background-color: ${props => props.active ? '#10A37F' : 'transparent'};
+  width: 38px;
+  height: 38px;
 
   &:hover {
-    background-color: ${props => props.disabled ? '#8e8ea0' : '#0d876a'};
-    color: white;
+    background-color: ${props => props.active ? '#0d8a6b' : '#f3f4f6'};
+    color: ${props => props.active ? 'white' : '#10A37F'};
+    transform: ${props => props.active ? 'scale(1.05)' : 'none'};
+  }
+
+  &:disabled {
+    background-color: #e2e8f0;
+    color: #a0aec0;
   }
 `;
 
 const HiddenFileInput = styled.input`
   display: none;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const InputActions = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+`;
+
+const CharCounter = styled.div<{ nearLimit: boolean }>`
+  font-size: 11px;
+  color: ${props => props.nearLimit ? '#f59e0b' : '#a0aec0'};
+  margin-right: 6px;
+  transition: color 0.2s;
+`;
+
+const DisclaimerText = styled.div`
+  display: none; /* Hide this disclaimer to avoid duplication with the main one in ChatPage */
+  position: fixed;
+  bottom: 5px;
+  left: 260px;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6e6e80;
+  padding: 5px 0;
+  background-color: white;
+  z-index: 5;
+  border-top: 1px solid #f0f0f0;
+
+  @media (max-width: 768px) {
+    left: 0;
+  }
 `;
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -124,15 +172,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const MAX_LENGTH = 4000;
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '24px';
+    }
+  }, []);
 
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    const value = e.target.value;
+    if (value.length <= MAX_LENGTH) {
+      setMessage(value);
 
-    // Improved auto-resize textarea based on content
-    const textarea = e.target;
-    textarea.style.height = '24px'; // Reset to minimum height
-    const scrollHeight = textarea.scrollHeight;
-    textarea.style.height = Math.min(scrollHeight, 150) + 'px';
+      // Auto-resize textarea based on content
+      const textarea = e.target;
+      textarea.style.height = '24px';
+      const scrollHeight = textarea.scrollHeight;
+      textarea.style.height = Math.min(scrollHeight, 150) + 'px';
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -165,52 +223,83 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const files = e.target.files;
     if (files && files.length > 0 && onFileUpload) {
       onFileUpload(files[0]);
-      // Reset the input
       e.target.value = '';
     }
   };
 
+  const hasText = message.trim().length > 0;
+  const nearLimit = message.length > MAX_LENGTH * 0.8;
+
   return (
-    <InputContainer>
-      <InputWrapper>
-        {onFileUpload && (
-          <>
+    <>
+      <InputContainer>
+        <InputWrapper>
+          <ButtonGroup>
+            {onFileUpload && (
+              <>
+                <ActionButton
+                  type="button"
+                  onClick={handleAttachClick}
+                  disabled={isLoading}
+                  title="Attach file"
+                >
+                  <IconWrapper Icon={FiPaperclip} size={18} />
+                </ActionButton>
+                <HiddenFileInput
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".pdf,.doc,.docx,.txt,.md"
+                />
+              </>
+            )}
             <ActionButton
               type="button"
-              onClick={handleAttachClick}
+              title="Add emoji"
               disabled={isLoading}
-              title="Attach file"
             >
-              <IconWrapper Icon={FiPaperclip} size={16} />
+              <IconWrapper Icon={FiSmile} size={18} />
             </ActionButton>
-            <HiddenFileInput
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".pdf,.doc,.docx,.txt,.md"
-            />
-          </>
-        )}
+          </ButtonGroup>
 
-        <StyledTextarea
-          ref={textareaRef}
-          value={message}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          disabled={isLoading}
-        />
+          <StyledTextarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message..."
+            disabled={isLoading}
+          />
 
-        <SendButton
-          type="button"
-          onClick={handleSendMessage}
-          disabled={!message.trim() || isLoading}
-          title="Send message"
-        >
-          <IconWrapper Icon={FiSend} size={16} />
-        </SendButton>
-      </InputWrapper>
-    </InputContainer>
+          <InputActions>
+            {message.length > 0 && (
+              <CharCounter nearLimit={nearLimit}>
+                {message.length}/{MAX_LENGTH}
+              </CharCounter>
+            )}
+            <ActionButton
+              type="button"
+              title="Voice input"
+              disabled={isLoading}
+            >
+              <IconWrapper Icon={FiMic} size={18} />
+            </ActionButton>
+            <SendButton
+              type="button"
+              onClick={handleSendMessage}
+              disabled={!hasText || isLoading}
+              active={hasText && !isLoading}
+              title="Send message"
+            >
+              <IconWrapper Icon={FiSend} size={18} />
+            </SendButton>
+          </InputActions>
+        </InputWrapper>
+      </InputContainer>
+      <DisclaimerText>
+        NFRS Assistant can make mistakes. Check important info.
+      </DisclaimerText>
+    </>
   );
 };
 

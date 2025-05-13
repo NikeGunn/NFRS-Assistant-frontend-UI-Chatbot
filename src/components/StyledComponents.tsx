@@ -218,10 +218,11 @@ export const EmptyChat = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: calc(100% - 100px); /* Reduce height to account for the input */
   color: #6e6e80;
   text-align: center;
   padding: 0 20px;
+  padding-bottom: 100px; /* Add padding to account for fixed input */
 
   h2 {
     margin-bottom: 20px;

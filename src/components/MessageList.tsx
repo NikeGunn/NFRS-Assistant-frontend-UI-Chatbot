@@ -1,357 +1,310 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { MessagesContainer, Message, SourcesContainer, SourcesTitle, SourceItem } from './StyledComponents';
 import { Message as MessageType, DocumentSource } from '../types/api.types';
-import { FiUser } from 'react-icons/fi';
+import { FiUser, FiExternalLink, FiChevronDown, FiChevronUp, FiFileText, FiLink } from 'react-icons/fi';
 import { RiRobot2Fill } from 'react-icons/ri';
 import IconWrapper from './IconWrapper';
 import { useChat } from '../context/ChatContext';
 
-// Main messages container
-const EnhancedMessagesContainer = styled(MessagesContainer)`
-  padding: 2rem 25%;  /* Further increased padding for more space on left and right */
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+// Main container for the message list
+const MessagesContainer = styled.div`
+  flex: 1;
   overflow-y: auto;
-  scrollbar-width: thin;
-  background-color: transparent; /* No background */
-
-  &::-webkit-scrollbar {
-    width: 5px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-  }
-
-  @media (max-width: 1400px) {
-    padding: 2rem 20%; /* Adjusted padding for larger screens */
-  }
+  padding: 20px 15%;
+  padding-bottom: 100px; /* Add padding to account for fixed input */
+  background-color: white;
 
   @media (max-width: 1200px) {
-    padding: 2rem 15%; /* Adjusted padding for medium screens */
-  }
-
-  @media (max-width: 1024px) {
-    padding: 2rem 10%; /* Less padding on smaller screens */
+    padding: 20px 10%;
+    padding-bottom: 100px;
   }
 
   @media (max-width: 768px) {
-    padding: 1.5rem 5%; /* Minimal padding on mobile */
+    padding: 20px 5%;
+    padding-bottom: 100px;
   }
 `;
 
-// Message with clear positioning - user right, assistant left
-const EnhancedMessage = styled(Message) <{ role: 'user' | 'assistant' }>`
-  padding: 1.2rem;
-  max-width: ${props => props.role === 'user' ? '75%' : '100%'};
-  margin-bottom: 2rem;  /* Increased margin between messages */
-  position: relative;
-  align-self: ${props => props.role === 'user' ? 'flex-end' : 'flex-start'};
-  box-shadow: none; /* Removed box shadow */
-  width: ${props => props.role === 'assistant' ? '100%' : 'auto'};
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  ${props => props.role === 'user' ? `
-    background-color: #10A37F;
-    color: white;
-    border-radius: 12px;
-    border-bottom-right-radius: 4px;
-  ` : `
-    background-color: transparent; /* Transparent background for assistant messages */
-    color: #000000; /* Black text color for assistant messages */
-    padding-left: 45px; /* Add space for the icon on the left */
-    border-radius: 0; /* No rounded corners for assistant messages */
-  `}
-
-  .content {
-    font-size: 0.95rem;
-    line-height: 1.6;
-  }
-
-  .avatar {
-    position: absolute;
-    ${props => props.role === 'user' ? `
-      bottom: -2px;
-      right: -36px; /* Increased space */
-    ` : `
-      left: 0px; /* Position avatar on the left */
-      top: 0px;
-    `}
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: ${props => props.role === 'user' ? '#0d876a' : '#ffffff'};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: ${props => props.role === 'user' ? 'white' : '#10A37F'};
-    font-size: 14px;
-    top: 20px; /* Align avatar to the top */
-  }
-`;
-
-// Enhanced sources container
-const EnhancedSourcesContainer = styled(SourcesContainer)`
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #f0f0f0;
-`;
-
-const EnhancedSourcesTitle = styled(SourcesTitle)`
-  display: flex;
-  align-items: center;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6e6e80;
-  margin-bottom: 0.5rem;
-
-  svg {
-    margin-right: 6px;
-  }
-`;
-
-const EnhancedSourceItem = styled(SourceItem)`
+// Message component with messages all aligned to the left
+const MessageBubble = styled.div<{ isUser: boolean }>`
   display: flex;
   flex-direction: column;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background-color: #f7f7f8;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  text-align: left;
-  position: relative;
-
-  .title {
-    font-weight: 500;
-    color: #10A37F;
-    text-align: left;
-  }
-
-  .description {
-    color: #6e6e80;
-    margin-top: 4px;
-    font-size: 0.8rem;
-    text-align: left;
-  }
-
-  .score {
-    margin-top: 4px;
-    font-size: 0.75rem;
-    color: #6e6e80;
-    background-color: rgba(16, 163, 127, 0.1);
-    padding: 2px 6px;
-    border-radius: 10px;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
-  }
-`;
-
-// Advanced typing indicator with pulsing, glitch and thinking effects
-const TypingIndicator = styled.div`
-  display: flex;
-  padding: 1rem 1.2rem;
-  max-width: 90%;
-  margin-bottom: 2rem;
-  align-self: flex-start;
-  background-color: transparent;
-  position: relative;
-  padding-left: 45px;
-
-  .dots {
-    display: flex;
-    align-items: center;
-
-    .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background-color: #10A37F;
-      margin-right: 6px;
-      opacity: 0.7;
-
-      &:nth-child(1) {
-        animation: pulse-hop 1.2s infinite ease-in-out;
-        animation-delay: -0.32s;
-      }
-
-      &:nth-child(2) {
-        animation: pulse-hop 1.2s infinite ease-in-out;
-        animation-delay: -0.16s;
-      }
-
-      &:nth-child(3) {
-        animation: pulse-hop 1.2s infinite ease-in-out;
-        margin-right: 0;
-      }
-
-      &:nth-child(4) {
-        width: 4px;
-        height: 14px;
-        border-radius: 1px;
-        margin-left: 10px;
-        animation: glitch-flicker 1s infinite;
-      }
-    }
-  }
-
-  .thinking-text {
-    margin-left: 10px;
-    font-size: 0.9rem;
-    color: #6e6e80;
-    opacity: 0.8;
-    animation: thinking-fade 2s infinite ease-in-out;
-  }
-
-  .avatar {
-    position: absolute;
-    left: 0px;
-    top: 20px;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #10A37F;
-    font-size: 14px;
-  }
-
-  @keyframes pulse-hop {
-    0%, 80%, 100% {
-      transform: scale(0.8);
-      opacity: 0.6;
-    }
-    40% {
-      transform: scale(1.2);
-      opacity: 1;
-    }
-    50% {
-      transform: translateY(-3px) scale(1);
-      opacity: 0.8;
-    }
-  }
-
-  @keyframes glitch-flicker {
-    0% { opacity: 1; height: 14px; }
-    10% { opacity: 0.8; height: 12px; transform: translateX(0); }
-    20% { opacity: 1; height: 14px; transform: translateX(0); }
-    30% { opacity: 0.6; height: 10px; transform: translateX(1px); }
-    40% { opacity: 1; height: 16px; transform: translateX(-1px); }
-    50% { opacity: 0.2; height: 8px; transform: translateX(0); }
-    60% { opacity: 1; height: 14px; transform: translateX(0); }
-    70% { opacity: 0.8; height: 12px; transform: translateX(1px); }
-    73% { opacity: 0.3; height: 10px; transform: translateX(-1px); }
-    76% { opacity: 1; height: 14px; transform: translateX(0); }
-    80% { opacity: 0.9; height: 13px; transform: translateX(0); }
-    100% { opacity: 1; height: 14px; transform: translateX(0); }
-  }
-
-  @keyframes thinking-fade {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.8; }
-  }
-`;
-
-// Message time display
-const MessageTime = styled.div<{ role: 'user' | 'assistant' }>`
-  font-size: 0.7rem;
-  color: ${props => props.role === 'user' ? 'rgba(255, 255, 255, 0.8)' : '#a9a9a9'};
-  margin-top: 6px;
-  text-align: right;
-`;
-
-// Improved typewriter text with advanced hacker-style typing animation
-const TypewriterText = styled.div`
-  padding: 1.2rem;
-  max-width: 90%;
-  margin-bottom: 2rem;
-  position: relative;
-  align-self: flex-start;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  box-shadow: none;
-  background-color: transparent;
-  color: #000000;
-  padding-left: 45px;
-  border-radius: 0;
+  align-items: flex-start; // Always align to the left
+  margin-bottom: 20px;
+  max-width: 100%;
   width: 100%;
 
+  .message-row {
+    display: flex;
+    align-items: flex-start;
+    max-width: ${props => props.isUser ? '80%' : '100%'};
+    width: ${props => props.isUser ? 'auto' : '100%'};
+  }
+
   .avatar {
-    position: absolute;
-    left: 0px;
-    top: 8px;
-    width: 30px;
-    height: 30px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    background-color: #ffffff;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #10A37F;
-    font-size: 14px;
-    top: 20px;
+    margin-right: 12px;
+
+    background-color: ${props => props.isUser ? '#6366f1' : '#10A37F'};
+    color: white;
   }
 
-  .typewriter-text {
-    display: inline;
-    white-space: pre-wrap;
-    word-break: break-word;
+  .message-content {
+    display: flex;
+    flex-direction: column;
+    width: ${props => props.isUser ? 'auto' : 'calc(100% - 48px)'};
   }
 
-  .typewriter-cursor {
-    display: inline-block;
-    width: 4px;
-    height: 1.1em;
-    background-color: #10A37F;
-    margin-left: 2px;
-    vertical-align: text-bottom;
-    animation: glitch-cursor 1.2s infinite;
-    position: relative;
-    opacity: 1;
-    box-shadow: 0 0 5px rgba(16, 163, 127, 0.5);
+  .message-bubble {
+    padding: 12px 16px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    width: ${props => props.isUser ? 'auto' : '100%'};
+    max-width: 100%;
+
+    ${props => props.isUser
+    ? `
+        background-color: #6366f1;
+        color: white;
+        border-bottom-left-radius: 4px;
+      ` : `
+        background-color: #f3f4f6;
+        color: #111827;
+        border-bottom-left-radius: 4px;
+      `
+  }
   }
 
-  @keyframes glitch-cursor {
-    0% { opacity: 1; transform: scaleY(1); background-color: #10A37F; }
-    10% { opacity: 1; transform: scaleY(1.3); }
-    15% { opacity: 0.3; transform: scaleY(0.8) translateX(1px); background-color: #0d8a6c; }
-    20% { opacity: 1; transform: scaleY(1) translateX(0); }
-    35% { opacity: 1; transform: scaleY(1.1); }
-    40% { opacity: 0.6; transform: scaleY(1) translateX(-1px); background-color: #12c096; }
-    45% { opacity: 1; transform: scaleY(1); }
-    60% { opacity: 1; transform: scaleY(1); }
-    65% { opacity: 0.2; transform: scaleY(1.4) translateX(1px); }
-    70% { opacity: 0.8; transform: scaleY(1.2) translateX(-2px); background-color: #0d8a6c; }
-    75% { opacity: 1; transform: scaleY(1) translateX(0); }
-    85% { opacity: 1; transform: scaleY(1); }
-    90% { opacity: 0.5; transform: scaleY(1.3); background-color: #12c096; }
-    100% { opacity: 1; transform: scaleY(1); background-color: #10A37F; }
+  .message-time {
+    font-size: 11px;
+    margin-top: 4px;
+    color: #6b7280;
+    align-self: flex-start;
+  }
+
+  .user-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: ${props => props.isUser ? '#6366f1' : '#10A37F'};
   }
 `;
 
-// Empty state container
-const EmptyStateContainer = styled.div`
+// Modern FAANG-inspired Sources section
+const ModernSourcesContainer = styled.div`
+  margin-top: 12px;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+`;
+
+const SourcesToggleButton = styled.button<{ isOpen: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 16px;
+  background-color: ${props => props.isOpen ? '#f0f6f3' : 'white'};
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  color: #444;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+
+  &:hover {
+    background-color: #f0f6f3;
+  }
+
+  .toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sources-count {
+    background-color: ${props => props.isOpen ? '#10A37F' : '#e9ecef'};
+    color: ${props => props.isOpen ? 'white' : '#495057'};
+    border-radius: 16px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  svg {
+    color: ${props => props.isOpen ? '#10A37F' : '#6b7280'};
+    transition: all 0.2s ease;
+  }
+`;
+
+const SourcesListContainer = styled.div`
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #e1e5e9;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+`;
+
+const ModernSourceItem = styled.a`
+  display: flex;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e1e5e9;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+  position: relative;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: #f8f9fa;
+  }
+
+  .source-icon {
+    margin-right: 12px;
+    color: #10A37F;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .source-content {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .source-title {
+    color: #202124;
+    font-weight: 500;
+    font-size: 14px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .source-description {
+    color: #5f6368;
+    font-size: 12px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .source-meta {
+    font-size: 11px;
+    color: #10A37F;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .external-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    color: #10A37F;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  &:hover .external-icon {
+    opacity: 1;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+  }
+
+  &:hover::after {
+    background-color: #10A37F;
+  }
+`;
+
+// Typing indicator shown when the AI is "thinking"
+const TypingIndicator = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #10A37F;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+  }
+
+  .typing-bubble {
+    background-color: #f3f4f6;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    background-color: #6b7280;
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: typingAnimation 1.5s infinite ease-in-out;
+  }
+
+  .dot:nth-child(1) { animation-delay: 0s; }
+  .dot:nth-child(2) { animation-delay: 0.3s; }
+  .dot:nth-child(3) { animation-delay: 0.6s; }
+
+  @keyframes typingAnimation {
+    0%, 100% { transform: translateY(0); opacity: 0.5; }
+    50% { transform: translateY(-5px); opacity: 1; }
+  }
+`;
+
+// Empty state when there are no messages
+const EmptyState = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6e6e80;
+  color: #6b7280;
   text-align: center;
-  padding: 2rem;
 
   svg {
-    font-size: 3rem;
     color: #10A37F;
-    opacity: 0.5;
+    font-size: 3rem;
     margin-bottom: 1rem;
   }
 
@@ -362,7 +315,7 @@ const EmptyStateContainer = styled.div`
 
   p {
     font-size: 0.9rem;
-    max-width: 400px;
+    max-width: 500px;
   }
 `;
 
@@ -373,132 +326,160 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { typingText } = useChat(); // Get typing text from context
+  const { typingText } = useChat();
+  const [sourcesOpen, setSourcesOpen] = useState<{ [key: string]: boolean }>({});
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Scroll to bottom whenever messages change
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingText]);
 
-  // Format timestamp
-  const formatTime = (timestamp: string) => {
+  // Format timestamp to show only time (HH:MM AM/PM)
+  const formatTime = (timestamp: string): string => {
     try {
       const date = new Date(timestamp);
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch (e) {
+    } catch {
       return '';
     }
   };
 
+  // Toggle sources visibility
+  const toggleSources = (messageId: string) => {
+    setSourcesOpen(prevState => ({
+      ...prevState,
+      [messageId]: !prevState[messageId]
+    }));
+  };
+
+  // If there are no messages and nothing is loading, show empty state
   if (messages.length === 0 && !isLoading && !typingText) {
     return (
-      <EmptyStateContainer>
+      <EmptyState>
         <IconWrapper Icon={RiRobot2Fill} />
         <h3>NFRS Assistant</h3>
         <p>I'm here to answer your questions about Nepal Financial Reporting Standards. Type a message to get started!</p>
-      </EmptyStateContainer>
+      </EmptyState>
     );
   }
 
-  // Helper function to deduplicate messages
-  const deduplicateMessages = (msgs: MessageType[]): MessageType[] => {
-    const uniqueMessages: MessageType[] = [];
-
-    msgs.forEach((message) => {
-      // If the last message is from the same role and has the same content, don't add it
-      const lastMessage = uniqueMessages[uniqueMessages.length - 1];
-
-      if (lastMessage &&
-        lastMessage.role === message.role &&
-        lastMessage.content === message.content) {
-        // Skip duplicate message
-        return;
-      }
-
-      uniqueMessages.push(message);
-    });
-
-    return uniqueMessages;
-  };
-
-  // Get deduplicated messages
-  const uniqueMessages = deduplicateMessages(messages);
-
   return (
-    <EnhancedMessagesContainer>
-      {uniqueMessages.map((message) => (
-        <EnhancedMessage key={message.id} role={message.role}>
-          <div className="content">
-            {message.content}
-
-            {/* Show sources if available */}
-            {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-              <EnhancedSourcesContainer>
-                <EnhancedSourcesTitle>
-                  Sources:
-                </EnhancedSourcesTitle>
-                {message.sources.map((source) => (
-                  <EnhancedSourceItem key={source.id}>
-                    <span className="title">{source.title}</span>
-                    <span className="description">- {source.description}</span>
-                    {source.relevance_score && (
-                      <span className="score">
-                        {Math.round(source.relevance_score * 100)}% relevant
-                      </span>
-                    )}
-                  </EnhancedSourceItem>
-                ))}
-              </EnhancedSourcesContainer>
-            )}
-
-            <MessageTime role={message.role}>
-              {formatTime(message.created_at)}
-            </MessageTime>
+    <MessagesContainer>
+      {messages.map((message) => (
+        <MessageBubble
+          key={message.id}
+          isUser={message.role === 'user'}
+        >
+          <div className="user-name">
+            {message.role === 'user' ? 'You' : 'NFRS Assistant'}
           </div>
-          <div className="avatar">
-            {message.role === 'user' ? (
-              <IconWrapper Icon={FiUser} />
-            ) : (
-              <IconWrapper Icon={RiRobot2Fill} />
-            )}
+          <div className="message-row">
+            <div className="avatar">
+              <IconWrapper
+                Icon={message.role === 'user' ? FiUser : RiRobot2Fill}
+                size={20}
+              />
+            </div>
+            <div className="message-content">
+              <div className="message-bubble">
+                {message.content}
+              </div>
+              {/* Display sources if they exist */}
+              {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
+                <ModernSourcesContainer>
+                  <SourcesToggleButton
+                    isOpen={sourcesOpen[message.id] || false}
+                    onClick={() => toggleSources(message.id)}
+                  >
+                    <div className="toggle-left">
+                      <span>Sources</span>
+                      <span className="sources-count">{message.sources.length}</span>
+                    </div>
+                    {sourcesOpen[message.id] ?
+                      <IconWrapper Icon={FiChevronUp} size={16} /> :
+                      <IconWrapper Icon={FiChevronDown} size={16} />
+                    }
+                  </SourcesToggleButton>
+                  {sourcesOpen[message.id] && (
+                    <SourcesListContainer>
+                      {message.sources.map((source, index) => (
+                        <ModernSourceItem
+                          key={index}
+                          href="javascript:void(0)" // Using a placeholder since url property doesn't exist
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <div className="source-icon">
+                            <IconWrapper Icon={FiFileText} size={16} />
+                          </div>
+                          <div className="source-content">
+                            <div className="source-title">
+                              {source.title}
+                            </div>
+                            {source.description && (
+                              <div className="source-description">
+                                {source.description}
+                              </div>
+                            )}
+                            {source.relevance_score && (
+                              <div className="source-meta">
+                                <span>{Math.round(source.relevance_score * 100)}% relevant</span>
+                                <IconWrapper Icon={FiLink} size={12} />
+                              </div>
+                            )}
+                          </div>
+                          <div className="external-icon">
+                            <IconWrapper Icon={FiExternalLink} size={16} />
+                          </div>
+                        </ModernSourceItem>
+                      ))}
+                    </SourcesListContainer>
+                  )}
+                </ModernSourcesContainer>
+              )}
+              <div className="message-time">
+                {formatTime(message.created_at)}
+              </div>
+            </div>
           </div>
-        </EnhancedMessage>
+        </MessageBubble>
       ))}
 
-      {/* Show typewriter effect for assistant's typing */}
-      {typingText !== null && (
-        <TypewriterText>
-          <div className="content">
-            <span className="typewriter-text">{typingText}</span>
-            <span className="typewriter-cursor"></span>
+      {/* Show the typing indicator when assistant is responding */}
+      {typingText && (
+        <MessageBubble isUser={false}>
+          <div className="user-name">
+            NFRS Assistant
           </div>
-          <div className="avatar">
-            <IconWrapper Icon={RiRobot2Fill} />
+          <div className="message-row">
+            <div className="avatar">
+              <IconWrapper Icon={RiRobot2Fill} size={20} />
+            </div>
+            <div className="message-content">
+              <div className="message-bubble">
+                {typingText}
+              </div>
+            </div>
           </div>
-        </TypewriterText>
+        </MessageBubble>
       )}
 
-      {/* Show typing indicator when loading */}
+      {/* Show typing indicator dots when loading but no text yet */}
       {isLoading && !typingText && (
         <TypingIndicator>
-          <div className="dots">
-            <div className="dot"></div>
-            <div className="dot"></div>
-            <div className="dot"></div>
-            <div className="dot"></div>
-          </div>
-          <div className="thinking-text">Thinking...</div>
           <div className="avatar">
-            <IconWrapper Icon={RiRobot2Fill} />
+            <IconWrapper Icon={RiRobot2Fill} size={20} />
+          </div>
+          <div className="typing-bubble">
+            <div className="dot"></div>
+            <div className="dot"></div>
+            <div className="dot"></div>
           </div>
         </TypingIndicator>
       )}
 
       <div ref={messagesEndRef} />
-    </EnhancedMessagesContainer>
+    </MessagesContainer>
   );
 };
 

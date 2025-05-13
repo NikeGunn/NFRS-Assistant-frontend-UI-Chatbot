@@ -325,10 +325,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         typewriterEffect(assistantMessage.content, (fullText) => {
           // Replace with actual message once typing is complete
           setTypingText(null);
-          setMessages(prev => [...prev.filter(m => m.id !== tempId), {
-            ...userMessage,
-            id: `user-${Date.now()}`
-          }, {
+          setMessages(prev => [...prev, {
             ...assistantMessage,
             content: fullText
           }]);
