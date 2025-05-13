@@ -454,23 +454,30 @@ const ChatPage: React.FC = () => {
   const handleSendMessage = async (content: string) => {
     try {
       if (!currentConversation) {
-        // Use content as title, limited to 30 characters, without timestamp
+        // Create a descriptive title based on the user's message
         const title = content.length > 30
           ? `${content.substring(0, 30)}...`
           : content;
-
+        
+        console.log("Creating new conversation with title:", title);
+        
+        // Create a new conversation
         const newConversationId = await createNewConversation(title);
+        
+        // Navigate to the new conversation URL
         navigate(`/chat/${newConversationId}`, { replace: true });
-
-        // Wait a short time for the conversation to be created and selected
-        setTimeout(() => {
-          sendMessage(content);
-        }, 100);
-      } else {
-        await sendMessage(content);
+        
+        // Important: Send the message with the new conversation ID
+        // This ensures we can send the message even before currentConversation is updated
+        await sendMessage(content, newConversationId);
+        
+        return; // Exit early since we've handled the message
       }
+      
+      // If we already have a conversation, just send the message directly
+      await sendMessage(content);
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error in handleSendMessage:', error);
     }
   };
 
@@ -622,16 +629,29 @@ const ChatPage: React.FC = () => {
               paddingBottom: '20px'
             }}>
               <h2>Welcome to NFRS Assistant</h2>
-              <p>Hello {user?.username || 'there'}! I'm your intelligent companion for navigating Nepal Financial Reporting Standards. How can I help you today?</p>
-              <div className="suggestions">
-                {suggestions.map((suggestion, index) => (
-                  <EnhancedSuggestionButton
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                  >
-                    {suggestion}
-                  </EnhancedSuggestionButton>
-                ))}
+              <p>Hello {user?.username || 'there'}! I'm your intelligent companion for navigating Nepal Financial Reporting Standards. Type a message below to start a conversation.</p>
+
+              <div style={{
+                marginTop: '30px',
+                textAlign: 'center',
+                color: '#6e6e80'
+              }}>
+                <p>You can ask questions about:</p>
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: '20px 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  alignItems: 'center'
+                }}>
+                  <li>• NFRS standards and implementation</li>
+                  <li>• Financial reporting requirements</li>
+                  <li>• Accounting treatments and disclosures</li>
+                  <li>• Comparative analysis with IFRS</li>
+                  <li>• Best practices for compliance</li>
+                </ul>
               </div>
             </EnhancedEmptyChat>
 

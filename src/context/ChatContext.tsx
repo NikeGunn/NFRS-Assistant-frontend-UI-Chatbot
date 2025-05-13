@@ -10,12 +10,14 @@ interface ChatContextType {
   error: string | null;
   language: 'en' | 'ne';
   typingText: string | null; // Add typing text state for typewriter effect
+  isMockMode: boolean; // Add isMockMode to the interface
+  mockMessages: Record<number, Message[]>; // Add mockMessages to the interface
   setLanguage: (lang: 'en' | 'ne') => void;
   createNewConversation: (title: string) => Promise<number>;
   selectConversation: (id: number) => Promise<void>;
   updateConversation: (id: number, title: string) => Promise<void>;
   deleteConversation: (id: number) => Promise<void>;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, newConversationId?: number) => Promise<void>;
   uploadDocument: (file: File) => Promise<void>;
   translateMessage: (text: string, sourceLang: 'en' | 'ne', targetLang: 'en' | 'ne') => Promise<string>;
 }
@@ -73,7 +75,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMockMode, setIsMockMode] = useState<boolean>(false); // Changed from true to false
+  const [isMockMode, setIsMockMode] = useState<boolean>(false); // Setting to false to disable mock mode
   const [language, setLanguage] = useState<'en' | 'ne'>('en');
   const [typingText, setTypingText] = useState<string | null>(null); // Typewriter effect state
 
@@ -87,13 +89,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(true);
       setError(null);
       try {
-        if (isMockMode) {
-          // Use mock data for testing
-          setConversations(MOCK_CONVERSATIONS);
-        } else {
-          const response = await chatService.getConversations();
-          setConversations(response.results);
-        }
+        const response = await chatService.getConversations();
+        setConversations(response.results);
       } catch (error: any) {
         setError('Failed to load conversations');
         console.error('Error fetching conversations:', error);
@@ -103,7 +100,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     fetchConversations();
-  }, [isMockMode]);
+  }, []);
 
   // Enhanced typewriter effect function with fast hacker-style typing
   const typewriterEffect = (text: string, onComplete: (fullText: string) => void) => {
@@ -145,45 +142,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      if (isMockMode) {
-        // Create a mock conversation
-        const newId = Math.max(0, ...conversations.map(c => c.id)) + 1;
-        const newConversation: Conversation = {
-          id: newId,
-          title,
-          language,
-          created_at: new Date().toISOString(),
-          user: 1
-        };
+      // Always use the real API endpoint
+      const response = await chatService.createConversation({
+        title,
+        language
+      });
 
-        setConversations(prevConversations => [...prevConversations, newConversation]);
-        setCurrentConversation(newConversation);
-        setMessages([]);
+      const newConversation: Conversation = {
+        id: response.id,
+        title: response.title,
+        language: response.language,
+        created_at: response.created_at,
+        user: response.user
+      };
 
-        // Add to mock data for persistence during the session
-        MOCK_MESSAGES[newId] = [];
+      setConversations(prevConversations => [...prevConversations, newConversation]);
+      setCurrentConversation(newConversation);
+      setMessages([]);
 
-        return newId;
-      } else {
-        const response = await chatService.createConversation({
-          title,
-          language
-        });
-
-        const newConversation: Conversation = {
-          id: response.id,
-          title: response.title,
-          language: response.language,
-          created_at: response.created_at,
-          user: response.user
-        };
-
-        setConversations(prevConversations => [...prevConversations, newConversation]);
-        setCurrentConversation(newConversation);
-        setMessages([]);
-
-        return response.id;
-      }
+      return response.id;
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
@@ -201,19 +178,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       const conversation = conversations.find(c => c.id === id);
+
       if (!conversation) {
         throw new Error('Conversation not found');
       }
 
       setCurrentConversation(conversation);
 
-      if (isMockMode) {
-        // Use mock messages
-        setMessages(MOCK_MESSAGES[id] || []);
-      } else {
-        const conversationDetails = await chatService.getConversationDetails(id);
-        setMessages(conversationDetails.messages || []);
-      }
+      // Always fetch conversation details from API
+      const conversationDetails = await chatService.getConversationDetails(id);
+      setMessages(conversationDetails.messages || []);
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
@@ -230,32 +204,20 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      if (isMockMode) {
-        // Update mock conversation
-        setConversations(prevConversations =>
-          prevConversations.map(conv =>
-            conv.id === id ? { ...conv, title } : conv
-          )
-        );
+      // Always use the real API
+      const updatedConversation = await chatService.updateConversation(id, {
+        title,
+        language: currentConversation?.language || language
+      });
 
-        if (currentConversation?.id === id) {
-          setCurrentConversation(prev => prev ? { ...prev, title } : null);
-        }
-      } else {
-        const updatedConversation = await chatService.updateConversation(id, {
-          title,
-          language: currentConversation?.language || language
-        });
+      setConversations(prevConversations =>
+        prevConversations.map(conv =>
+          conv.id === id ? updatedConversation : conv
+        )
+      );
 
-        setConversations(prevConversations =>
-          prevConversations.map(conv =>
-            conv.id === id ? updatedConversation : conv
-          )
-        );
-
-        if (currentConversation?.id === id) {
-          setCurrentConversation(updatedConversation);
-        }
+      if (currentConversation?.id === id) {
+        setCurrentConversation(updatedConversation);
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
@@ -273,32 +235,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      if (isMockMode) {
-        // Delete mock conversation
-        setConversations(prevConversations =>
-          prevConversations.filter(conv => conv.id !== id)
-        );
+      // Always use the real API
+      await chatService.deleteConversation(id);
 
-        if (currentConversation?.id === id) {
-          setCurrentConversation(null);
-          setMessages([]);
-        }
+      setConversations(prevConversations =>
+        prevConversations.filter(conv => conv.id !== id)
+      );
 
-        // Remove from mock data
-        if (id in MOCK_MESSAGES) {
-          delete MOCK_MESSAGES[id];
-        }
-      } else {
-        await chatService.deleteConversation(id);
-
-        setConversations(prevConversations =>
-          prevConversations.filter(conv => conv.id !== id)
-        );
-
-        if (currentConversation?.id === id) {
-          setCurrentConversation(null);
-          setMessages([]);
-        }
+      if (currentConversation?.id === id) {
+        setCurrentConversation(null);
+        setMessages([]);
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
@@ -313,11 +259,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Send a new message
-  const sendMessage = async (content: string): Promise<void> => {
-    if (!currentConversation) {
+  const sendMessage = async (content: string, newConversationId?: number): Promise<void> => {
+    // Check if we have a current conversation or a new conversation ID was provided
+    if (!currentConversation && !newConversationId) {
       setError('No active conversation');
       return;
     }
+
+    // Use the provided conversation ID or fall back to the current conversation's ID
+    const conversationId = newConversationId || currentConversation!.id;
 
     setIsLoading(true);
     setError(null);
@@ -326,10 +276,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Generate a temporary ID for optimistic UI update
       const tempId = `temp-${Date.now()}`;
 
-      // Add user message to UI immediately
+      // Add user message to UI immediately for better UX
       const userMessage: Message = {
         id: tempId,
-        conversation_id: currentConversation.id,
+        conversation_id: conversationId,
         role: 'user',
         content,
         created_at: new Date().toISOString()
@@ -337,89 +287,53 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setMessages(prev => [...prev, userMessage]);
 
-      if (isMockMode) {
-        // Mock response for testing
-        setTimeout(() => {
-          const assistantMessage: Message = {
-            id: `assistant-${Date.now()}`,
-            conversation_id: currentConversation.id,
-            role: 'assistant',
-            content: 'This is a mock response from the assistant.',
-            created_at: new Date().toISOString(),
-            sources: [
-              {
-                id: 'mock-source',
-                title: 'Mock Source Document',
-                description: 'This is a mock source document',
-                relevance_score: 0.95
-              }
-            ]
-          };
+      // Send the message to the API endpoint
+      console.log(`Sending message to API: ${content}`);
+      const response = await chatService.sendMessage({
+        conversation_id: conversationId,
+        content,
+        message: content, // Add message field that matches content
+        role: 'user',
+        language: language
+      });
 
-          // Use the typewriter effect
-          typewriterEffect(assistantMessage.content, (fullText) => {
-            // Replace with actual message once typing is complete
-            setTypingText(null);
-            setMessages(prev => [...prev.filter(m => m.id !== tempId), {
-              ...userMessage,
-              id: `user-${Date.now()}`
-            }, {
-              ...assistantMessage,
-              content: fullText
-            }]);
-            setIsLoading(false);
-          });
+      if (response) {
+        // Replace the temporary message with a properly formatted user message
+        setMessages(prev =>
+          prev.map(msg => msg.id === tempId ? {
+            ...msg,
+            id: `user-${Date.now()}` // Since backend might not return ID for user message
+          } : msg)
+        );
 
-        }, 1000);
-      } else {
-        // Send the actual API request - using both content and message fields as per API requirements
-        const response = await chatService.sendMessage({
-          conversation_id: currentConversation.id,
-          content,
-          message: content, // Add message field that matches content
-          role: 'user',
-          language: language
+        // Format the assistant's response as a Message
+        const assistantMessage: Message = {
+          id: `assistant-${Date.now()}`,
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: (response as any).message || response.content, // Type assertion for message property
+          created_at: new Date().toISOString(),
+          sources: response.sources ? response.sources.map(source => ({
+            id: source.id.toString(),
+            title: source.title,
+            description: source.title, // Use title as description if not available
+            relevance_score: 1.0
+          })) : undefined
+        };
+
+        // Use the typewriter effect
+        typewriterEffect(assistantMessage.content, (fullText) => {
+          // Replace with actual message once typing is complete
+          setTypingText(null);
+          setMessages(prev => [...prev.filter(m => m.id !== tempId), {
+            ...userMessage,
+            id: `user-${Date.now()}`
+          }, {
+            ...assistantMessage,
+            content: fullText
+          }]);
+          setIsLoading(false);
         });
-
-        if (response) {
-          // Backend response contains message content directly
-          // Replace the temporary message with a properly formatted user message
-          setMessages(prev =>
-            prev.map(msg => msg.id === tempId ? {
-              ...msg,
-              id: `user-${Date.now()}` // Since backend might not return ID for user message
-            } : msg)
-          );
-
-          // Format the assistant's response as a Message
-          const assistantMessage: Message = {
-            id: `assistant-${Date.now()}`,
-            conversation_id: currentConversation.id,
-            role: 'assistant',
-            content: (response as any).message || response.content, // Type assertion for message property
-            created_at: new Date().toISOString(),
-            sources: response.sources ? response.sources.map(source => ({
-              id: source.id.toString(),
-              title: source.title,
-              description: source.title, // Use title as description if not available
-              relevance_score: 1.0
-            })) : undefined
-          };
-
-          // Use the typewriter effect
-          typewriterEffect(assistantMessage.content, (fullText) => {
-            // Replace with actual message once typing is complete
-            setTypingText(null);
-            setMessages(prev => [...prev.filter(m => m.id !== tempId), {
-              ...userMessage,
-              id: `user-${Date.now()}`
-            }, {
-              ...assistantMessage,
-              content: fullText
-            }]);
-            setIsLoading(false);
-          });
-        }
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
@@ -492,41 +406,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       formData.append('file', file);
       formData.append('conversation_id', currentConversation.id.toString());
 
-      if (isMockMode) {
-        // Mock document upload
-        await new Promise(resolve => setTimeout(resolve, 1500));
+      // Always use the real API for document uploads
+      const document = await knowledgeService.uploadDocument(formData);
 
-        // Create a temporary message to show the document was uploaded
-        const tempMessage: Message = {
-          id: `doc-upload-${Date.now()}`,
-          conversation_id: currentConversation.id,
-          role: 'user' as const,
-          content: `Uploaded document: ${file.name}`,
-          created_at: new Date().toISOString()
-        };
+      // Add a user message indicating document upload
+      const userMessage: Message = {
+        id: `user-doc-${Date.now()}`,
+        conversation_id: currentConversation.id,
+        role: 'user' as const,
+        content: `Uploaded document: ${document.title || file.name}`,
+        created_at: new Date().toISOString()
+      };
 
-        setMessages(prev => [...prev, tempMessage]);
-
-        // Add to mock messages
-        MOCK_MESSAGES[currentConversation.id] = [
-          ...(MOCK_MESSAGES[currentConversation.id] || []),
-          tempMessage
-        ];
-      } else {
-        // Actual document upload using the API service
-        const document = await knowledgeService.uploadDocument(formData);
-
-        // Add a user message indicating document upload
-        const userMessage: Message = {
-          id: `user-doc-${Date.now()}`,
-          conversation_id: currentConversation.id,
-          role: 'user' as const,
-          content: `Uploaded document: ${document.title || file.name}`,
-          created_at: new Date().toISOString()
-        };
-
-        setMessages(prev => [...prev, userMessage]);
-      }
+      setMessages(prev => [...prev, userMessage]);
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
@@ -547,26 +439,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      if (isMockMode) {
-        // Simple mock translation (not real!)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      // Always use the real API for translations
+      const response = await chatService.translateText({
+        text,
+        source_language: sourceLang,
+        target_language: targetLang
+      });
 
-        if (sourceLang === 'en' && targetLang === 'ne') {
-          return `नेपालीमा अनुवाद: ${text}`;
-        } else if (sourceLang === 'ne' && targetLang === 'en') {
-          return `English translation: ${text}`;
-        }
-
-        return text;
-      } else {
-        const response = await chatService.translateText({
-          text,
-          source_language: sourceLang,
-          target_language: targetLang
-        });
-
-        return response.translated_text;
-      }
+      return response.translated_text;
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
@@ -588,6 +468,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       error,
       language,
       typingText, // Add typing text to context
+      isMockMode, // Add isMockMode to context
+      mockMessages: MOCK_MESSAGES, // Add mockMessages to context
       setLanguage,
       createNewConversation,
       selectConversation,

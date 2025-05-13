@@ -216,8 +216,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     createNewConversation,
     selectConversation,
     updateConversation,
-    deleteConversation
+    deleteConversation,
+    language,
+    error,
+    isLoading,
+    sendMessage,
+    isMockMode,
+    mockMessages  // Add mockMessages from context
   } = useChat();
+
+  // Remove the duplicate declaration of isMockMode
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingConversation, setEditingConversation] = useState<number | null>(null);
@@ -241,11 +249,62 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const handleSelectConversation = async (conversation: Conversation) => {
     try {
+      // Create a timestamp for debugging
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`[${timestamp}] Selecting conversation: ${conversation.id}`);
+
+      // Get the mock message content before selecting the conversation
+      let mockMessageContent = '';
+      if (isMockMode && mockMessages[conversation.id] && mockMessages[conversation.id].length > 0) {
+        const firstMockMessage = mockMessages[conversation.id][0];
+        if (firstMockMessage && firstMockMessage.role === 'user') {
+          mockMessageContent = firstMockMessage.content;
+        }
+      }
+
       await selectConversation(conversation.id);
       navigate(`/chat/${conversation.id}`);
+
+      // If we found a mock message and we're in a conversation now, send the message to the API
+      if (mockMessageContent && currentConversation) {
+        // Brief timeout to ensure the UI is ready
+        setTimeout(() => {
+          // Call sendMessage which will send to API via chatService.sendMessage
+          console.log(`Sending mock message to API: ${mockMessageContent}`);
+          sendMessage(mockMessageContent);
+        }, 300);
+      }
+
       if (onClose) onClose();
     } catch (error) {
       console.error('Error selecting conversation:', error);
+
+      // Handle the "Conversation not found" error specifically
+      if (error instanceof Error && error.message === 'Conversation not found' && isMockMode) {
+        // If the conversation is not found and we're in mock mode,
+        // create a new conversation with the current timestamp
+        const title = `New Chat ${new Date().toLocaleTimeString()}`;
+        try {
+          const conversationId = await createNewConversation(title);
+          navigate(`/chat/${conversationId}`);
+          if (onClose) onClose();
+
+          // Check if we have mock messages for this conversation ID
+          if (mockMessages[conversation.id] && mockMessages[conversation.id].length > 0) {
+            const firstMockMessage = mockMessages[conversation.id][0];
+            if (firstMockMessage && firstMockMessage.role === 'user') {
+              // Wait briefly for the conversation to be properly set up
+              // Then send the message to the API
+              setTimeout(() => {
+                console.log(`Sending mock message to API in new conversation: ${firstMockMessage.content}`);
+                sendMessage(firstMockMessage.content);
+              }, 500);
+            }
+          }
+        } catch (createError) {
+          console.error('Failed to create a new conversation:', createError);
+        }
+      }
     }
   };
 
