@@ -5,6 +5,8 @@ import { FiUser, FiExternalLink, FiChevronDown, FiChevronUp, FiFileText, FiLink 
 import { RiRobot2Fill } from 'react-icons/ri';
 import IconWrapper from './IconWrapper';
 import { useChat } from '../context/ChatContext';
+import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
 
 // Main container for the message list
 const MessagesContainer = styled.div`
@@ -319,6 +321,76 @@ const EmptyState = styled.div`
   }
 `;
 
+// Style for markdown content
+const MarkdownContent = styled.div`
+  & > * {
+    margin-bottom: 0.5rem;
+  }
+
+  & > *:last-child {
+    margin-bottom: 0;
+  }
+
+  p {
+    margin: 0.5rem 0;
+  }
+
+  code {
+    background-color: #f1f1f1;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+  }
+
+  pre {
+    background-color: #f1f1f1;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+  }
+
+  pre code {
+    background-color: transparent;
+    padding: 0;
+    white-space: pre;
+  }
+
+  ul, ol {
+    padding-left: 1.5rem;
+  }
+
+  blockquote {
+    border-left: 4px solid #e2e8f0;
+    padding-left: 1rem;
+    margin-left: 0;
+    color: #718096;
+  }
+
+  a {
+    color: #10A37F;
+    text-decoration: underline;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75rem 0;
+  }
+
+  th, td {
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f8f9fa;
+  }
+`;
+
 interface MessageListProps {
   messages: MessageType[];
   isLoading?: boolean;
@@ -352,6 +424,26 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
     }));
   };
 
+  // Safely render markdown content
+  const renderMessageContent = (content: string, isAssistant: boolean) => {
+    if (!isAssistant) {
+      return <span>{content}</span>;
+    }
+
+    try {
+      return (
+        <MarkdownContent>
+          <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+            {content}
+          </ReactMarkdown>
+        </MarkdownContent>
+      );
+    } catch (error) {
+      console.error('Error rendering markdown:', error);
+      return <span>{content}</span>;
+    }
+  };
+
   // If there are no messages and nothing is loading, show empty state
   if (messages.length === 0 && !isLoading && !typingText) {
     return (
@@ -382,7 +474,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
             </div>
             <div className="message-content">
               <div className="message-bubble">
-                {message.content}
+                {renderMessageContent(message.content, message.role === 'assistant')}
               </div>
               {/* Display sources if they exist */}
               {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
@@ -457,7 +549,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
             </div>
             <div className="message-content">
               <div className="message-bubble">
-                {typingText}
+                {renderMessageContent(typingText, true)}
               </div>
             </div>
           </div>
