@@ -264,7 +264,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   // Handle manual refresh of conversations
   const handleRefreshConversations = async () => {
     if (isRefreshing) return;
-    
+
     setIsRefreshing(true);
     try {
       await refreshConversations();
@@ -430,8 +430,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </NewChatButton>
 
         {user && (
-          <RefreshButton 
-            onClick={handleRefreshConversations} 
+          <RefreshButton
+            onClick={handleRefreshConversations}
             className={isRefreshing ? 'loading' : ''}
             title="Refresh conversations"
           >

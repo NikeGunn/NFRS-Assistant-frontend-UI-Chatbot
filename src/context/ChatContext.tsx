@@ -51,18 +51,18 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setMessages([]);
         return;
       }
-      
+
       setIsLoading(true);
       setError(null);
       try {
         // Use the user-conversations endpoint which automatically filters by current user
         const response = await chatService.getUserConversations();
-        
+
         // Sort conversations by last activity (newest first)
         const sortedConversations = [...response.results].sort(
           (a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime()
         );
-        
+
         setConversations(sortedConversations);
       } catch (error: any) {
         setError('Failed to load conversations');
@@ -450,17 +450,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user || !localStorage.getItem('access_token')) {
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
     try {
       const response = await chatService.getUserConversations();
-      
+
       // Sort conversations by last activity (newest first)
       const sortedConversations = [...response.results].sort(
         (a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime()
       );
-      
+
       setConversations(sortedConversations);
     } catch (error: any) {
       setError('Failed to refresh conversations');
