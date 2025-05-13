@@ -540,7 +540,7 @@ const LoginPage: React.FC = () => {
         username: registerUsername,
         email: registerEmail,
         password: registerPassword,
-        password2: registerPassword2,
+        confirm_password: registerPassword2,  // Updated from password2 to confirm_password
         preferred_language: preferredLanguage
       };
 

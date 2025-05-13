@@ -444,8 +444,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         <SidebarFooter>
           <UserInfo onClick={handleLogout}>
-            <div className="avatar">{user?.username?.[0]?.toUpperCase() || 'U'}</div>
-            <div className="name">{user?.username || 'User'}</div>
+            <div className="avatar">
+              {user?.user?.username ? user.user.username[0].toUpperCase() : 'U'}
+            </div>
+            <div className="name">
+              {user?.user?.username || 'User'}
+            </div>
             <IconWrapper Icon={FiLogOut} />
           </UserInfo>
         </SidebarFooter>

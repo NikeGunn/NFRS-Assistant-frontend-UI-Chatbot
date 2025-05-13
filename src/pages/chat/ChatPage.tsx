@@ -60,7 +60,7 @@ const UserProfile = styled.div`
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background-color: #10A37F;
+    background-color: #6366f1; /* Changed to purple to match chat interface */
     color: white;
     display: flex;
     align-items: center;
@@ -73,7 +73,7 @@ const UserProfile = styled.div`
   .name {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #202123;
+    color: #6366f1; /* Changed to purple to match chat interface */
     max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -507,6 +507,15 @@ const ChatPage: React.FC = () => {
     };
   }, []);
 
+  // Debug function to check user object structure
+  useEffect(() => {
+    if (user) {
+      console.log("User data:", JSON.stringify(user, null, 2));
+    } else {
+      console.log("No user data available");
+    }
+  }, [user]);
+
   const handleSendMessage = async (content: string) => {
     try {
       if (!currentConversation) {
@@ -607,6 +616,15 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Create a wrapper function to adapt the uploadDocument function to accept FormData
+  const handleDocumentUpload = async (formData: FormData) => {
+    try {
+      await uploadDocument(formData);
+    } catch (error) {
+      console.error('Error uploading document:', error);
+    }
+  };
+
   return (
     <EnhancedContainer>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -624,33 +642,13 @@ const ChatPage: React.FC = () => {
           </div>
 
           <HeaderControls>
-            <LanguageSwitcher>
-              <button
-                className={language === 'en' ? 'active' : ''}
-                onClick={() => setLanguage('en')}
-              >
-                English
-              </button>
-              <button
-                className={language === 'ne' ? 'active' : ''}
-                onClick={() => setLanguage('ne')}
-              >
-                नेपाली
-              </button>
-            </LanguageSwitcher>
-
-            <NewChatButton onClick={handleNewChat}>
-              <IconWrapper Icon={FiPlus} size={16} />
-              <span>New Chat</span>
-            </NewChatButton>
-
             <UserMenuContainer ref={userMenuRef}>
               <UserProfile onClick={() => setUserMenuOpen(!userMenuOpen)}>
                 <div className="avatar">
-                  <IconWrapper Icon={FiUser} size={16} />
+                  {user?.user?.username ? user.user.username[0].toUpperCase() : <IconWrapper Icon={FiUser} size={16} />}
                 </div>
                 <div className="name">
-                  {user?.username || 'User'}
+                  {user?.user?.username || 'User'}
                 </div>
                 <IconWrapper Icon={FiChevronDown} size={16} />
               </UserProfile>
@@ -658,7 +656,7 @@ const ChatPage: React.FC = () => {
               <UserMenu isOpen={userMenuOpen}>
                 <UserMenuItem>
                   <IconWrapper Icon={FiUser} size={16} />
-                  Profile
+                  {user?.user?.username || 'Profile'}
                 </UserMenuItem>
                 <UserMenuItem className="logout" onClick={handleLogout}>
                   <IconWrapper Icon={FiLogOut} size={16} />
@@ -720,7 +718,7 @@ const ChatPage: React.FC = () => {
             {/* Input box - fixed at bottom */}
             <ChatInput
               onSendMessage={handleSendMessage}
-              onFileUpload={uploadDocument}
+              onFileUpload={handleDocumentUpload}
               isLoading={isLoading}
             />
           </div>
@@ -750,7 +748,7 @@ const ChatPage: React.FC = () => {
 
             <ChatInput
               onSendMessage={handleSendMessage}
-              onFileUpload={uploadDocument}
+              onFileUpload={handleDocumentUpload}
               isLoading={isLoading}
             />
           </EnhancedChatContainer>

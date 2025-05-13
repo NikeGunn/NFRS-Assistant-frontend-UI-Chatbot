@@ -15,9 +15,22 @@ export interface User {
   preferred_language: 'en' | 'ne';
 }
 
-export interface UserProfile extends User {
-  date_joined: string;
-  last_login?: string;
+export interface UserDetails {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  is_staff: boolean;
+}
+
+export interface UserProfile {
+  user: UserDetails;
+  preferred_language: 'en' | 'ne';
+  organization: any | null;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ApiKey {
@@ -147,7 +160,7 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
-  password2: string;
+  confirm_password: string;  // Updated to match API expectations
   preferred_language: 'en' | 'ne';
 }
 
@@ -201,6 +214,8 @@ export interface DocumentUploadRequest {
   description: string;
   language: 'en' | 'ne';
   is_public: boolean;
+  file_type: string;
+  conversation_id?: number;
 }
 
 export interface UpdateDocumentRequest {

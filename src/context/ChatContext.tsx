@@ -18,7 +18,7 @@ interface ChatContextType {
   updateConversation: (id: number, title: string) => Promise<void>;
   deleteConversation: (id: number) => Promise<void>;
   sendMessage: (content: string, newConversationId?: number) => Promise<void>;
-  uploadDocument: (file: File) => Promise<void>;
+  uploadDocument: (formData: FormData) => Promise<void>; // Change from File to FormData
   translateMessage: (text: string, sourceLang: 'en' | 'ne', targetLang: 'en' | 'ne') => Promise<string>;
 }
 
@@ -390,7 +390,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setMessages(prev => [...prev, assistantMessage]);
   };
 
-  const uploadDocument = async (file: File): Promise<void> => {
+  const uploadDocument = async (formData: FormData): Promise<void> => {
     if (!currentConversation) {
       throw new Error('No active conversation');
     }
@@ -398,10 +398,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      // Create a FormData object to send the file
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('conversation_id', currentConversation.id.toString());
+      // Make sure conversation_id is added to the form data if not already present
+      if (!formData.has('conversation_id')) {
+        formData.append('conversation_id', currentConversation.id.toString());
+      }
 
       // Always use the real API for document uploads
       const document = await knowledgeService.uploadDocument(formData);
@@ -411,7 +411,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         id: `user-doc-${Date.now()}`,
         conversation_id: currentConversation.id,
         role: 'user' as const,
-        content: `Uploaded document: ${document.title || file.name}`,
+        content: `Uploaded document: ${document.title || formData.get('title') || 'Document'}`,
         created_at: new Date().toISOString()
       };
 

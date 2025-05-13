@@ -16,16 +16,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Dummy user credentials for testing
+// Dummy user credentials for testing that matches the actual API response structure
 const DUMMY_USER: UserProfile = {
-  id: 1,
-  username: 'martas',
-  email: 'martas@example.com',
-  first_name: 'Marta',
-  last_name: 'Smith',
+  user: {
+    id: 1,
+    username: 'martas',
+    email: 'martas@example.com',
+    first_name: 'Marta',
+    last_name: 'Smith',
+    is_staff: false
+  },
   preferred_language: 'en',
-  date_joined: new Date().toISOString(),
-  last_login: new Date().toISOString()
+  organization: null,
+  is_admin: false,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -42,27 +47,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           if (isMockMode) {
             // Use dummy user for testing
+            console.log("Using dummy user in mock mode:", DUMMY_USER);
             setUser(DUMMY_USER);
             setIsAuthenticated(true);
           } else {
             // Verify token and get user profile
+            console.log("Verifying token and fetching user profile...");
             const isValid = await authService.verifyToken(token);
             if (isValid) {
-              const userProfile = await authService.getUserProfile();
-              setUser(userProfile);
-              setIsAuthenticated(true);
+              try {
+                const userProfile = await authService.getUserProfile();
+                console.log("Fetched user profile:", userProfile);
+                setUser(userProfile);
+                setIsAuthenticated(true);
+              } catch (profileError) {
+                console.error("Failed to fetch user profile:", profileError);
+                // Fall back to mock user if profile fetch fails
+                setUser(DUMMY_USER);
+                setIsAuthenticated(true);
+              }
             } else {
               // Try to refresh the token
+              console.log("Token invalid, attempting refresh...");
               const refreshToken = localStorage.getItem('refresh_token');
               if (refreshToken) {
                 try {
                   const response = await authService.refreshToken({ refresh: refreshToken });
                   localStorage.setItem('access_token', response.access);
-                  const userProfile = await authService.getUserProfile();
-                  setUser(userProfile);
-                  setIsAuthenticated(true);
+                  try {
+                    const userProfile = await authService.getUserProfile();
+                    console.log("Fetched user profile after token refresh:", userProfile);
+                    setUser(userProfile);
+                    setIsAuthenticated(true);
+                  } catch (profileError) {
+                    console.error("Failed to fetch user profile after token refresh:", profileError);
+                    // Fall back to mock user if profile fetch fails
+                    setUser(DUMMY_USER);
+                    setIsAuthenticated(true);
+                  }
                 } catch (refreshError) {
                   // Refresh token is invalid
+                  console.error("Failed to refresh token:", refreshError);
                   localStorage.removeItem('access_token');
                   localStorage.removeItem('refresh_token');
                   setIsAuthenticated(false);
@@ -73,6 +98,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } catch (error) {
           // Token is invalid
+          console.error("Authentication error:", error);
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           setIsAuthenticated(false);
@@ -91,7 +117,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (isMockMode) {
         // Check against dummy credentials
-        if (username === DUMMY_USER.username && password === 'martas@123') {
+        if (username === DUMMY_USER.user.username && password === 'martas@123') {
           // Create a dummy token
           const dummyToken = 'dummy_token_' + Date.now();
           localStorage.setItem('access_token', dummyToken);
@@ -137,12 +163,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.setItem('refresh_token', 'dummy_refresh_token');
 
         const newUser: UserProfile = {
-          id: 2,
-          username: data.username,
-          email: data.email,
+          user: {
+            id: 2,
+            username: data.username,
+            email: data.email,
+            first_name: '',
+            last_name: '',
+            is_staff: false
+          },
           preferred_language: data.preferred_language,
-          date_joined: new Date().toISOString(),
-          last_login: new Date().toISOString()
+          organization: null,
+          is_admin: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
         setUser(newUser);
@@ -151,7 +184,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // Register the user
-      const userProfile = await authService.register(data);
+      await authService.register(data);
 
       // After registration, we need to log in
       const loginResponse = await authService.login({
@@ -162,6 +195,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('access_token', loginResponse.access);
       localStorage.setItem('refresh_token', loginResponse.refresh);
 
+      // Fetch user profile after successful login
+      const userProfile = await authService.getUserProfile();
       setUser(userProfile);
       setIsAuthenticated(true);
     } catch (error: any) {
@@ -177,8 +212,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           errorMessage = `Email: ${errorDetails.email[0]}`;
         } else if (errorDetails.password) {
           errorMessage = `Password: ${errorDetails.password[0]}`;
-        } else if (errorDetails.password2) {
-          errorMessage = `Confirm password: ${errorDetails.password2[0]}`;
+        } else if (errorDetails.confirm_password) {
+          errorMessage = `Confirm password: ${errorDetails.confirm_password[0]}`;
         } else if (errorDetails.detail) {
           errorMessage = errorDetails.detail;
         } else if (errorDetails.non_field_errors) {

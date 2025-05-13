@@ -3,12 +3,14 @@ import React, { useState, useRef, ChangeEvent, KeyboardEvent, useEffect } from '
 import { FiPaperclip, FiSend, FiMic, FiSmile } from 'react-icons/fi';
 import styled from 'styled-components';
 import IconWrapper from './IconWrapper';
+import DocumentUploadModal from './DocumentUploadModal';
+import { useChat } from '../context/ChatContext';
 // Empty export to ensure file is treated as a module
 export { };
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
-  onFileUpload?: (file: File) => void;
+  onFileUpload?: (formData: FormData) => Promise<void>; // Changed from File to FormData
   isLoading?: boolean;
 }
 
@@ -173,6 +175,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const MAX_LENGTH = 4000;
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
+  const { uploadDocument } = useChat();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -214,16 +218,28 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleAttachClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    // Open the document upload modal instead of just opening file picker
+    setIsDocumentModalOpen(true);
   };
 
+  // This is kept for compatibility but we don't use it directly anymore
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0 && onFileUpload) {
-      onFileUpload(files[0]);
+      // Create FormData for legacy support
+      const formData = new FormData();
+      formData.append('file', files[0]);
+
+      // Call the onFileUpload with FormData instead of File
+      onFileUpload(formData);
       e.target.value = '';
+    }
+  };
+
+  // New handler for document uploads through the modal
+  const handleDocumentUpload = async (formData: FormData) => {
+    if (onFileUpload) {
+      await uploadDocument(formData);
     }
   };
 
@@ -241,15 +257,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   type="button"
                   onClick={handleAttachClick}
                   disabled={isLoading}
-                  title="Attach file"
+                  title="Attach document"
                 >
                   <IconWrapper Icon={FiPaperclip} size={18} />
                 </ActionButton>
+                {/* Keep this for compatibility */}
                 <HiddenFileInput
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.txt,.md"
+                  accept=".pdf"
                 />
               </>
             )}
@@ -296,6 +313,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </InputActions>
         </InputWrapper>
       </InputContainer>
+
+      {/* Document Upload Modal */}
+      <DocumentUploadModal
+        isOpen={isDocumentModalOpen}
+        onClose={() => setIsDocumentModalOpen(false)}
+        onUpload={handleDocumentUpload}
+        isLoading={isLoading}
+      />
+
       <DisclaimerText>
         NFRS Assistant can make mistakes. Check important info.
       </DisclaimerText>

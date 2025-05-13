@@ -109,9 +109,10 @@ export const authService = {
     }
   },
 
-  register: async (userData: RegisterRequest): Promise<UserProfile> => {
-    const response = await apiClient.post<UserProfile>('/users/register/', userData);
-    return response.data;
+  register: async (userData: RegisterRequest): Promise<any> => {
+    // Updated return type to match the API response that only returns a message
+    const response = await apiClient.post('/users/register/', userData);
+    return response.data; // { message: "User registered successfully" }
   },
 
   getUserProfile: async (): Promise<UserProfile> => {
