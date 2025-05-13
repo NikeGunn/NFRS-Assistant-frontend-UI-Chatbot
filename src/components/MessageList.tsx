@@ -118,38 +118,45 @@ const EnhancedSourcesTitle = styled(SourcesTitle)`
 
 const EnhancedSourceItem = styled(SourceItem)`
   display: flex;
-  align-items: center;
+  flex-direction: column;
   margin-bottom: 0.5rem;
   padding: 0.5rem 0.75rem;
   background-color: #f7f7f8;
   border-radius: 6px;
   font-size: 0.85rem;
+  text-align: left;
+  position: relative;
 
   .title {
     font-weight: 500;
     color: #10A37F;
+    text-align: left;
   }
 
   .description {
     color: #6e6e80;
-    margin-left: 6px;
+    margin-top: 4px;
     font-size: 0.8rem;
+    text-align: left;
   }
 
   .score {
-    margin-left: auto;
+    margin-top: 4px;
     font-size: 0.75rem;
     color: #6e6e80;
     background-color: rgba(16, 163, 127, 0.1);
     padding: 2px 6px;
     border-radius: 10px;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
   }
 `;
 
-// Improved typing indicator with bounce animation
+// Advanced typing indicator with pulsing, glitch and thinking effects
 const TypingIndicator = styled.div`
   display: flex;
-  padding: 1.2rem;
+  padding: 1rem 1.2rem;
   max-width: 90%;
   margin-bottom: 2rem;
   align-self: flex-start;
@@ -162,27 +169,50 @@ const TypingIndicator = styled.div`
     align-items: center;
 
     .dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background-color: #10A37F;
-      margin-right: 4px;
-      animation: bounce 0.4s infinite ease-in-out both;
+      margin-right: 6px;
+      opacity: 0.7;
 
       &:nth-child(1) {
+        animation: pulse-hop 1.2s infinite ease-in-out;
         animation-delay: -0.32s;
       }
 
       &:nth-child(2) {
+        animation: pulse-hop 1.2s infinite ease-in-out;
         animation-delay: -0.16s;
       }
+
+      &:nth-child(3) {
+        animation: pulse-hop 1.2s infinite ease-in-out;
+        margin-right: 0;
+      }
+
+      &:nth-child(4) {
+        width: 4px;
+        height: 14px;
+        border-radius: 1px;
+        margin-left: 10px;
+        animation: glitch-flicker 1s infinite;
+      }
     }
+  }
+
+  .thinking-text {
+    margin-left: 10px;
+    font-size: 0.9rem;
+    color: #6e6e80;
+    opacity: 0.8;
+    animation: thinking-fade 2s infinite ease-in-out;
   }
 
   .avatar {
     position: absolute;
     left: 0px;
-    top: 0px;
+    top: 20px;
     width: 30px;
     height: 30px;
     border-radius: 50%;
@@ -192,16 +222,41 @@ const TypingIndicator = styled.div`
     justify-content: center;
     color: #10A37F;
     font-size: 14px;
-    top: 20px; /* Align avatar to the top */
   }
 
-  @keyframes bounce {
+  @keyframes pulse-hop {
     0%, 80%, 100% {
-      transform: scale(0);
+      transform: scale(0.8);
+      opacity: 0.6;
     }
     40% {
-      transform: scale(1);
+      transform: scale(1.2);
+      opacity: 1;
     }
+    50% {
+      transform: translateY(-3px) scale(1);
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes glitch-flicker {
+    0% { opacity: 1; height: 14px; }
+    10% { opacity: 0.8; height: 12px; transform: translateX(0); }
+    20% { opacity: 1; height: 14px; transform: translateX(0); }
+    30% { opacity: 0.6; height: 10px; transform: translateX(1px); }
+    40% { opacity: 1; height: 16px; transform: translateX(-1px); }
+    50% { opacity: 0.2; height: 8px; transform: translateX(0); }
+    60% { opacity: 1; height: 14px; transform: translateX(0); }
+    70% { opacity: 0.8; height: 12px; transform: translateX(1px); }
+    73% { opacity: 0.3; height: 10px; transform: translateX(-1px); }
+    76% { opacity: 1; height: 14px; transform: translateX(0); }
+    80% { opacity: 0.9; height: 13px; transform: translateX(0); }
+    100% { opacity: 1; height: 14px; transform: translateX(0); }
+  }
+
+  @keyframes thinking-fade {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
   }
 `;
 
@@ -213,7 +268,7 @@ const MessageTime = styled.div<{ role: 'user' | 'assistant' }>`
   text-align: right;
 `;
 
-// Improved typewriter text with smooth typing animation
+// Improved typewriter text with advanced hacker-style typing animation
 const TypewriterText = styled.div`
   padding: 1.2rem;
   max-width: 90%;
@@ -229,22 +284,21 @@ const TypewriterText = styled.div`
   border-radius: 0;
   width: 100%;
 
-.avatar {
-  position: absolute;
-  left: 0px;
-  top: 8px; /* slightly downward */
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #10A37F;
-  font-size: 14px;
-  top: 20px; /* Align avatar to the top */
-}
-
+  .avatar {
+    position: absolute;
+    left: 0px;
+    top: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #10A37F;
+    font-size: 14px;
+    top: 20px;
+  }
 
   .typewriter-text {
     display: inline;
@@ -254,21 +308,32 @@ const TypewriterText = styled.div`
 
   .typewriter-cursor {
     display: inline-block;
-    width: 3px;
-    height: 1.2em;
+    width: 4px;
+    height: 1.1em;
     background-color: #10A37F;
-    margin-left: 3px;
+    margin-left: 2px;
     vertical-align: text-bottom;
-    animation: blink-and-move 0.5s infinite;
+    animation: glitch-cursor 1.2s infinite;
     position: relative;
     opacity: 1;
+    box-shadow: 0 0 5px rgba(16, 163, 127, 0.5);
   }
 
-  @keyframes blink-and-move {
-    0%, 100% { opacity: 1; transform: scaleY(1); }
-    25% { opacity: 1; transform: scaleY(1.1) translateY(-1px); }
-    50% { opacity: 0.6; transform: scaleY(0.8) translateY(1px); }
-    75% { opacity: 1; transform: scaleY(1.05) translateY(0); }
+  @keyframes glitch-cursor {
+    0% { opacity: 1; transform: scaleY(1); background-color: #10A37F; }
+    10% { opacity: 1; transform: scaleY(1.3); }
+    15% { opacity: 0.3; transform: scaleY(0.8) translateX(1px); background-color: #0d8a6c; }
+    20% { opacity: 1; transform: scaleY(1) translateX(0); }
+    35% { opacity: 1; transform: scaleY(1.1); }
+    40% { opacity: 0.6; transform: scaleY(1) translateX(-1px); background-color: #12c096; }
+    45% { opacity: 1; transform: scaleY(1); }
+    60% { opacity: 1; transform: scaleY(1); }
+    65% { opacity: 0.2; transform: scaleY(1.4) translateX(1px); }
+    70% { opacity: 0.8; transform: scaleY(1.2) translateX(-2px); background-color: #0d8a6c; }
+    75% { opacity: 1; transform: scaleY(1) translateX(0); }
+    85% { opacity: 1; transform: scaleY(1); }
+    90% { opacity: 0.5; transform: scaleY(1.3); background-color: #12c096; }
+    100% { opacity: 1; transform: scaleY(1); background-color: #10A37F; }
   }
 `;
 
@@ -332,8 +397,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
     return (
       <EmptyStateContainer>
         <IconWrapper Icon={RiRobot2Fill} />
-        <h3>Start a conversation</h3>
-        <p>Ask a question about NFRS or any financial reporting standard to get started.</p>
+        <h3>NFRS Assistant</h3>
+        <p>I'm here to answer your questions about Nepal Financial Reporting Standards. Type a message to get started!</p>
       </EmptyStateContainer>
     );
   }
@@ -423,7 +488,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
             <div className="dot"></div>
             <div className="dot"></div>
             <div className="dot"></div>
+            <div className="dot"></div>
           </div>
+          <div className="thinking-text">Thinking...</div>
           <div className="avatar">
             <IconWrapper Icon={RiRobot2Fill} />
           </div>

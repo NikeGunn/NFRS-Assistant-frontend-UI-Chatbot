@@ -105,40 +105,30 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchConversations();
   }, [isMockMode]);
 
-  // Enhanced typewriter effect function with more natural typing patterns
+  // Enhanced typewriter effect function with fast hacker-style typing
   const typewriterEffect = (text: string, onComplete: (fullText: string) => void) => {
     let currentIndex = 0;
     setTypingText("");
 
-    // Create variable typing speeds for a more natural effect
+    // Create variable typing speeds for a more hacker-like effect
     const getTypingDelay = () => {
-      // Occasionally add a longer pause (like a human thinking)
-      if (Math.random() < 0.05) return 250 + Math.random() * 500;
+      // Very rarely add a tiny pause (simulating network lag or processing)
+      if (Math.random() < 0.01) return 20 + Math.random() * 30;
 
-      // Pause slightly longer at punctuation
-      if (currentIndex > 0 && ['.', ',', '!', '?', ':'].includes(text.charAt(currentIndex - 1))) {
-        return 150 + Math.random() * 200;
-      }
-
-      // Occasionally pause briefly between words
-      if (currentIndex > 0 && text.charAt(currentIndex - 1) === ' ') {
-        if (Math.random() < 0.2) return 100 + Math.random() * 100;
-      }
-
-      // Normal typing speed with slight variations
-      return 15 + Math.random() * 25;
+      // Super fast typing for most characters (hacker speed)
+      return Math.random() < 0.7 ? 1 : 2 + Math.random() * 3;
     };
 
     const typeNextChar = () => {
       if (currentIndex < text.length) {
-        // Type the next chunk of characters (makes it a bit faster)
-        const chunkSize = Math.random() < 0.8 ? 1 : Math.floor(Math.random() * 3) + 1;
-        const chunk = text.substr(currentIndex, chunkSize);
+        // Type larger chunks of characters for rapid typing effect
+        const chunkSize = Math.floor(Math.random() * 8) + 3; // Type 3-10 characters at once
+        const chunk = text.substr(currentIndex, Math.min(chunkSize, text.length - currentIndex));
 
         setTypingText(prev => prev + chunk);
         currentIndex += chunk.length;
 
-        // Schedule the next character(s) with variable delay
+        // Schedule the next chunk with variable delay
         setTimeout(typeNextChar, getTypingDelay());
       } else {
         // Typing complete

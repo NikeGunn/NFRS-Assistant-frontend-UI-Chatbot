@@ -454,6 +454,7 @@ const ChatPage: React.FC = () => {
   const handleSendMessage = async (content: string) => {
     try {
       if (!currentConversation) {
+        // Use content as title, limited to 30 characters, without timestamp
         const title = content.length > 30
           ? `${content.substring(0, 30)}...`
           : content;
@@ -621,7 +622,7 @@ const ChatPage: React.FC = () => {
               paddingBottom: '20px'
             }}>
               <h2>Welcome to NFRS Assistant</h2>
-              <p>Your intelligent companion for navigating Nepal Financial Reporting Standards. Ask me anything about NFRS.</p>
+              <p>Hello {user?.username || 'there'}! I'm your intelligent companion for navigating Nepal Financial Reporting Standards. How can I help you today?</p>
               <div className="suggestions">
                 {suggestions.map((suggestion, index) => (
                   <EnhancedSuggestionButton
@@ -668,15 +669,7 @@ const ChatPage: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    {currentConversation?.title || 'New Conversation'}
-                    <div className="edit-actions">
-                      <button className="action-button" onClick={handleEditTitle}>
-                        <IconWrapper Icon={FiEdit} size={16} />
-                      </button>
-                      <button className="action-button" onClick={handleDeleteClick}>
-                        <IconWrapper Icon={FiTrash2} size={16} />
-                      </button>
-                    </div>
+                    {/* No title or buttons here for a cleaner interface */}
                   </>
                 )}
               </ChatTitle>

@@ -15,7 +15,7 @@ interface ChatInputProps {
 const InputContainer = styled.div`
   display: flex;
   align-items: center;
-  padding: 0.8rem 25%; /* Match MessageList padding */
+  padding: 1.15rem 25%; /* Match MessageList padding */
   background-color: transparent;
   border-top: 1px solid #e1e4e8;
   position: sticky;
@@ -45,15 +45,15 @@ const InputWrapper = styled.div`
   align-items: center;
   width: 100%;
   background-color: #fff; /* White background like ChatGPT */
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 35px;
+  padding: 18px 10px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); /* Enhanced subtle shadow like ChatGPT */
   border: 1px solid #e5e5e5;
 `;
 
 const StyledTextarea = styled.textarea`
   flex: 1;
-  min-height: 24px; /* Minimum height */
+  min-height: 45px; /* Minimum height */
   max-height: 150px;
   padding: 8px 10px;
   border: none;

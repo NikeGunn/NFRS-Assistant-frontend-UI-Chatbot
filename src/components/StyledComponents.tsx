@@ -457,6 +457,7 @@ export const SourcesContainer = styled.div`
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #e5e5e5;
+  max-width: 100%;
 `;
 
 export const SourcesTitle = styled.div`
@@ -464,20 +465,48 @@ export const SourcesTitle = styled.div`
   font-weight: 600;
   color: #6e6e80;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
 `;
 
 export const SourceItem = styled.div`
   font-size: 14px;
   color: #6e6e80;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: #f7f7f8;
+  display: flex;
+  flex-direction: column;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  text-align: left;
 
   a {
     color: #10A37F;
     text-decoration: none;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-all;
+    text-align: left;
 
     &:hover {
       text-decoration: underline;
     }
+  }
+
+  span {
+    margin-top: 4px;
+    display: block;
+    text-align: left;
+  }
+
+  .score {
+    text-align: right;
+    align-self: flex-end;
   }
 `;
 
