@@ -2,7 +2,7 @@
 
 A modern, AI-powered web application that provides intuitive access to Nepal Financial Reporting Standards information through a conversational interface.
 
-![NFRS Assistant UI](https://github.com/NikeGunn/imagess/blob/main/Nepal%20Financial%20Reporting%20Standards%20(NFRS)/nfrs.png?raw=true)
+![NFRS Assistant UI](https://github.com/NikeGunn/imagess/blob/main/Nepal%20Financial%20Reporting%20Standards%20(NFRS)/Nfrs%20assistant_nikhil_developer.PNG?raw=true)
 
 ## Features
 

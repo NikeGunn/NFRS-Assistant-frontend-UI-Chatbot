@@ -43,13 +43,32 @@ export interface ApiKey {
 }
 
 // Chat Types
+export interface UserInfo {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface LastMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  content_preview: string;
+  created_at: string;
+}
+
 export interface Conversation {
   id: number;
   title: string;
   language: 'en' | 'ne';
   created_at: string;
-  user: number;
-  message_count?: number;
+  updated_at: string;
+  is_active: boolean;
+  message_count: number;
+  user: UserInfo;
+  last_message: LastMessage;
+  last_activity: string;
 }
 
 export interface ConversationsResponse {

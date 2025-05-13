@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FiPlus, FiMessageSquare, FiLogOut, FiEdit, FiTrash2, FiX } from 'react-icons/fi';
+import { FiPlus, FiMessageSquare, FiLogOut, FiEdit, FiTrash2, FiX, FiUser, FiRefreshCw } from 'react-icons/fi';
 import {
   Sidebar as SidebarContainer,
   NewChatButton,
@@ -207,6 +207,35 @@ const EmptyConversations = styled.div`
   font-size: 14px;
 `;
 
+const RefreshButton = styled.button`
+  position: absolute;
+  top: 17px;
+  right: 50px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  &.loading {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -217,20 +246,34 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     selectConversation,
     updateConversation,
     deleteConversation,
+    refreshConversations,
     language,
     error,
     isLoading,
     sendMessage,
     isMockMode,
-    mockMessages  // Add mockMessages from context
+    mockMessages
   } = useChat();
-
-  // Remove the duplicate declaration of isMockMode
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingConversation, setEditingConversation] = useState<number | null>(null);
   const [titleInput, setTitleInput] = useState('');
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Handle manual refresh of conversations
+  const handleRefreshConversations = async () => {
+    if (isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      await refreshConversations();
+    } catch (error) {
+      console.error('Failed to refresh conversations', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleNewChat = async () => {
     if (isCreating) return;
@@ -386,10 +429,24 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {isCreating ? 'Creating...' : 'New chat'}
         </NewChatButton>
 
+        {user && (
+          <RefreshButton 
+            onClick={handleRefreshConversations} 
+            className={isRefreshing ? 'loading' : ''}
+            title="Refresh conversations"
+          >
+            <IconWrapper Icon={FiRefreshCw} size={18} />
+          </RefreshButton>
+        )}
+
         <SidebarList>
-          {conversations.length === 0 ? (
+          {!user ? (
             <EmptyConversations>
-              No conversations yet
+              Please log in to see your conversations
+            </EmptyConversations>
+          ) : conversations.length === 0 ? (
+            <EmptyConversations>
+              {isLoading ? 'Loading your conversations...' : 'No conversations yet'}
             </EmptyConversations>
           ) : (
             conversations.map((conversation) => (
@@ -472,3 +529,4 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 };
 
 export default Sidebar;
+

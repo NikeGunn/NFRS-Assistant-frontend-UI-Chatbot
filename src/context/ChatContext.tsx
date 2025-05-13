@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Conversation, Message, DocumentSource } from '../types/api.types';
 import { chatService, knowledgeService } from '../services/api.service';
+import { useAuth } from './AuthContext';
 
 interface ChatContextType {
   conversations: Conversation[];
@@ -20,56 +21,17 @@ interface ChatContextType {
   sendMessage: (content: string, newConversationId?: number) => Promise<void>;
   uploadDocument: (formData: FormData) => Promise<void>; // Change from File to FormData
   translateMessage: (text: string, sourceLang: 'en' | 'ne', targetLang: 'en' | 'ne') => Promise<string>;
+  refreshConversations: () => Promise<void>; // Add refreshConversations function to interface
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 // Mock data for testing
-const MOCK_CONVERSATIONS: Conversation[] = [
-  { id: 1, title: 'NFRS 15 Discussion', created_at: new Date().toISOString(), language: 'en', user: 1 },
-  { id: 2, title: 'Financial Reporting Guidelines', created_at: new Date().toISOString(), language: 'en', user: 1 }
-];
-
-const MOCK_MESSAGES: Record<number, Message[]> = {
-  1: [
-    { id: '1-1', conversation_id: 1, role: 'user' as const, content: 'What is NFRS 15?', created_at: new Date().toISOString() },
-    {
-      id: '1-2',
-      conversation_id: 1,
-      role: 'assistant' as const,
-      content: 'NFRS 15 is the Nepal Financial Reporting Standard for Revenue from Contracts with Customers. It establishes a comprehensive framework for determining when and how much revenue to recognize. The standard is based on a core principle that an entity should recognize revenue to depict the transfer of promised goods or services to customers in an amount that reflects the consideration to which the entity expects to be entitled in exchange for those goods or services.',
-      created_at: new Date().toISOString(),
-      sources: [
-        {
-          id: 'src-1',
-          title: 'NFRS 15 - Revenue Recognition',
-          description: 'Official document for NFRS 15',
-          relevance_score: 0.95
-        }
-      ]
-    }
-  ],
-  2: [
-    { id: '2-1', conversation_id: 2, role: 'user' as const, content: 'What are the disclosure requirements under NFRS?', created_at: new Date().toISOString() },
-    {
-      id: '2-2',
-      conversation_id: 2,
-      role: 'assistant' as const,
-      content: 'NFRS disclosure requirements vary by standard but generally include providing information about the recognition, measurement, presentation and disclosure of financial statement items. Key disclosures typically include providing information about the recognition, measurement, presentation and disclosure of financial statement items. Key disclosures typically include accounting policies used, judgments made in applying those policies, assumptions about the future, and details about financial statement line items including their composition and changes during the reporting period.',
-      created_at: new Date().toISOString(),
-      sources: [
-        {
-          id: 'src-2',
-          title: 'NFRS Disclosure Guide',
-          description: 'Comprehensive guide to NFRS disclosures',
-          relevance_score: 0.88
-        }
-      ]
-    }
-  ]
-};
+const MOCK_CONVERSATIONS: Conversation[] = [];
+const MOCK_MESSAGES: Record<number, Message[]> = {};
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
@@ -79,28 +41,39 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [language, setLanguage] = useState<'en' | 'ne'>('en');
   const [typingText, setTypingText] = useState<string | null>(null); // Typewriter effect state
 
-  // Load conversations
+  // Load user conversations when user changes
   useEffect(() => {
-    const fetchConversations = async () => {
-      if (!localStorage.getItem('access_token')) {
+    const fetchUserConversations = async () => {
+      // Only fetch if user is logged in
+      if (!user || !localStorage.getItem('access_token')) {
+        setConversations([]);
+        setCurrentConversation(null);
+        setMessages([]);
         return;
       }
-
+      
       setIsLoading(true);
       setError(null);
       try {
-        const response = await chatService.getConversations();
-        setConversations(response.results);
+        // Use the user-conversations endpoint which automatically filters by current user
+        const response = await chatService.getUserConversations();
+        
+        // Sort conversations by last activity (newest first)
+        const sortedConversations = [...response.results].sort(
+          (a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime()
+        );
+        
+        setConversations(sortedConversations);
       } catch (error: any) {
         setError('Failed to load conversations');
-        console.error('Error fetching conversations:', error);
+        console.error('Error fetching user conversations:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchConversations();
-  }, []);
+    fetchUserConversations();
+  }, [user]);
 
   // Enhanced typewriter effect function with fast hacker-style typing
   const typewriterEffect = (text: string, onComplete: (fullText: string) => void) => {
@@ -148,12 +121,29 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         language
       });
 
+      // Create a properly structured conversation object with all required properties
       const newConversation: Conversation = {
         id: response.id,
         title: response.title,
         language: response.language,
         created_at: response.created_at,
-        user: response.user
+        updated_at: response.created_at, // Initially same as created_at
+        is_active: true,
+        message_count: 0,
+        user: {
+          id: user?.user?.id || 0,
+          username: user?.user?.username || '',
+          first_name: user?.user?.first_name || '',
+          last_name: user?.user?.last_name || '',
+          email: user?.user?.email || ''
+        },
+        last_message: {
+          id: 0,
+          role: 'user',
+          content_preview: '',
+          created_at: response.created_at
+        },
+        last_activity: response.created_at
       };
 
       setConversations(prevConversations => [...prevConversations, newConversation]);
@@ -456,6 +446,30 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const refreshConversations = async (): Promise<void> => {
+    if (!user || !localStorage.getItem('access_token')) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await chatService.getUserConversations();
+      
+      // Sort conversations by last activity (newest first)
+      const sortedConversations = [...response.results].sort(
+        (a, b) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime()
+      );
+      
+      setConversations(sortedConversations);
+    } catch (error: any) {
+      setError('Failed to refresh conversations');
+      console.error('Error refreshing conversations:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <ChatContext.Provider value={{
       conversations,
@@ -474,7 +488,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       deleteConversation,
       sendMessage,
       uploadDocument,
-      translateMessage
+      translateMessage,
+      refreshConversations
     }}>
       {children}
     </ChatContext.Provider>

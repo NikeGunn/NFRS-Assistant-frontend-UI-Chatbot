@@ -152,6 +152,11 @@ export const authService = {
 
 // Chat API Service
 export const chatService = {
+  getUserConversations: async (): Promise<ConversationsResponse> => {
+    const response = await apiClient.get<ConversationsResponse>('/chat/user-conversations/');
+    return response.data;
+  },
+
   getConversations: async (): Promise<ConversationsResponse> => {
     const response = await apiClient.get<ConversationsResponse>('/chat/conversations/');
     return response.data;
