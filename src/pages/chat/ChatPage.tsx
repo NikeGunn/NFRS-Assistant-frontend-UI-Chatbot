@@ -454,26 +454,31 @@ const ChatPage: React.FC = () => {
   const handleSendMessage = async (content: string) => {
     try {
       if (!currentConversation) {
-        // Create a descriptive title based on the user's message
-        const title = content.length > 30
+        // Get current time for timestamp
+        const timestamp = new Date().toLocaleTimeString();
+
+        // Create a descriptive title based on the user's message and add a timestamp
+        // This matches the format used in the Sidebar's handleNewChat function
+        const messagePreview = content.length > 30
           ? `${content.substring(0, 30)}...`
           : content;
-        
+        const title = `${messagePreview} ${timestamp}`;
+
         console.log("Creating new conversation with title:", title);
-        
+
         // Create a new conversation
         const newConversationId = await createNewConversation(title);
-        
+
         // Navigate to the new conversation URL
         navigate(`/chat/${newConversationId}`, { replace: true });
-        
+
         // Important: Send the message with the new conversation ID
         // This ensures we can send the message even before currentConversation is updated
         await sendMessage(content, newConversationId);
-        
+
         return; // Exit early since we've handled the message
       }
-      
+
       // If we already have a conversation, just send the message directly
       await sendMessage(content);
     } catch (error) {
