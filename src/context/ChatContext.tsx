@@ -146,7 +146,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         last_activity: response.created_at
       };
 
-      setConversations(prevConversations => [...prevConversations, newConversation]);
+      setConversations(prevConversations => [newConversation, ...prevConversations]);
       setCurrentConversation(newConversation);
       setMessages([]);
 
