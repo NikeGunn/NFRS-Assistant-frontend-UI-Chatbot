@@ -7,6 +7,7 @@ import IconWrapper from './IconWrapper';
 import { useChat } from '../context/ChatContext';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
 
 // Main container for the message list
 const MessagesContainer = styled.div`
@@ -71,6 +72,7 @@ const MessageBubble = styled.div<{ isUser: boolean }>`
     word-wrap: break-word;
     width: ${props => props.isUser ? 'auto' : '100%'};
     max-width: 100%;
+    overflow-x: auto; /* Add horizontal scrolling for wide tables */
 
     ${props => props.isUser
     ? `
@@ -83,6 +85,13 @@ const MessageBubble = styled.div<{ isUser: boolean }>`
         border-bottom-left-radius: 4px;
       `
   }
+
+    /* Ensure tables have adequate space */
+    & > .financial-table {
+      margin: 1rem 0;
+      min-width: 100%;
+      max-width: fit-content;
+    }
   }
 
   .message-time {
@@ -248,6 +257,126 @@ const ModernSourceItem = styled.a`
   }
 `;
 
+// Style for expert information
+const ExpertsContainer = styled.div`
+  margin-top: 12px;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+`;
+
+const ExpertsToggleButton = styled.button<{ isOpen: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 16px;
+  background-color: ${props => props.isOpen ? '#f0f6f3' : 'white'};
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  color: #444;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+
+  &:hover {
+    background-color: #f0f6f3;
+  }
+
+  .toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .experts-count {
+    background-color: ${props => props.isOpen ? '#10A37F' : '#e9ecef'};
+    color: ${props => props.isOpen ? 'white' : '#495057'};
+    border-radius: 16px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  svg {
+    color: ${props => props.isOpen ? '#10A37F' : '#6b7280'};
+    transition: all 0.2s ease;
+  }
+`;
+
+const ExpertsListContainer = styled.div`
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #e1e5e9;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+`;
+
+const ExpertItem = styled.div`
+  display: flex;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e1e5e9;
+  transition: background-color 0.15s ease;
+  position: relative;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: #f8f9fa;
+  }
+
+  .expert-icon {
+    margin-right: 12px;
+    color: #10A37F;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .expert-content {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .expert-name {
+    color: #202124;
+    font-weight: 500;
+    font-size: 14px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .expert-title {
+    color: #5f6368;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+  }
+
+  &:hover::after {
+    background-color: #10A37F;
+  }
+`;
+
 // Typing indicator shown when the AI is "thinking"
 const TypingIndicator = styled.div`
   display: flex;
@@ -374,20 +503,103 @@ const MarkdownContent = styled.div`
     text-decoration: underline;
   }
 
+  /* Enhanced table styling for financial data */
   table {
     border-collapse: collapse;
     width: 100%;
-    margin: 0.75rem 0;
+    margin: 1rem 0;
+    font-size: 0.95em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: white;
   }
 
-  th, td {
-    border: 1px solid #e2e8f0;
-    padding: 0.5rem;
-    text-align: left;
+  thead {
+    background-color: #f2f7f5;
+    color: #2d3748;
+    border-bottom: 2px solid #edf2f7;
   }
 
   th {
-    background-color: #f8f9fa;
+    padding: 0.75rem;
+    font-weight: 600;
+    text-align: left;
+    border: 1px solid #e2e8f0;
+    position: relative;
+  }
+
+  /* Header for balance sheets, align text to center */
+  th.header, td.header {
+    background-color: #f0f6f3;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  /* For financial data, align amounts to right */
+  td.amount, th.amount {
+    text-align: right;
+  }
+
+  td {
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+
+  /* Row highlighting for balance sheets */
+  tr.subtotal td {
+    border-top: 1px solid #10A37F;
+    border-bottom: 1px solid #10A37F;
+    background-color: #f7faf9;
+    font-weight: 500;
+  }
+
+  tr.total td {
+    border-top: 2px solid #10A37F;
+    border-bottom: 2px solid #10A37F;
+    background-color: #f0f6f3;
+    font-weight: 700;
+  }
+
+  /* Alternate row styling */
+  tbody tr:nth-child(even) {
+    background-color: #f8fafb;
+  }
+
+  tbody tr:hover {
+    background-color: #f0f6f3;
+  }
+
+  /* Currency formatting for financial data */
+  .currency {
+    font-variant-numeric: tabular-nums;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+
+  /* Nepalese rupee formatting */
+  .npr {
+    position: relative;
+    padding-left: 1rem;
+  }
+
+  .npr::before {
+    content: 'रू';
+    position: absolute;
+    left: 0;
+  }
+
+  /* Balance sheet specific */
+  .bs-asset {
+    color: #2c7a7b;
+  }
+
+  .bs-liability {
+    color: #8c1616;
+  }
+
+  .bs-equity {
+    color: #3b4f6c;
   }
 `;
 
@@ -400,6 +612,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { typingText } = useChat();
   const [sourcesOpen, setSourcesOpen] = useState<{ [key: string]: boolean }>({});
+  const [expertsOpen, setExpertsOpen] = useState<{ [key: string]: boolean }>({});
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -424,6 +637,14 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
     }));
   };
 
+  // Toggle experts visibility
+  const toggleExperts = (messageId: string) => {
+    setExpertsOpen(prevState => ({
+      ...prevState,
+      [messageId]: !prevState[messageId]
+    }));
+  };
+
   // Safely render markdown content
   const renderMessageContent = (content: string, isAssistant: boolean) => {
     if (!isAssistant) {
@@ -433,7 +654,38 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
     try {
       return (
         <MarkdownContent>
-          <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+          <ReactMarkdown
+            rehypePlugins={[rehypeSanitize]}
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Custom rendering for tables to support financial data
+              table: ({ node, ...props }) => (
+                <table className="financial-table" {...props} />
+              ),
+              // Format numeric cells with right alignment
+              td: ({ node, children, ...props }) => {
+                // Check if content is numeric or money value to apply right alignment
+                const text = String(children);
+                const isNumeric = /^[+-]?\d+(\.\d+)?$/.test(text.replace(/,/g, ''));
+                const isMoney = /^[₹रू]?\s*\d+(\.\d+)?/.test(text.replace(/,/g, '')) ||
+                  /\d+(\.\d+)?\s*[₹रू]$/.test(text.replace(/,/g, ''));
+
+                const className = isNumeric || isMoney ? 'amount' : '';
+                return <td className={className} {...props}>{children}</td>;
+              },
+              // For table headers that contain "Amount", "Total", "Balance", etc.
+              th: ({ node, children, ...props }) => {
+                const text = String(children).toLowerCase();
+                const isAmountHeader = text.includes('amount') ||
+                  text.includes('balance') ||
+                  text.includes('total') ||
+                  text.includes('rs.') ||
+                  text.includes('रू');
+                const className = isAmountHeader ? 'amount' : '';
+                return <th className={className} {...props}>{children}</th>;
+              }
+            }}
+          >
             {content}
           </ReactMarkdown>
         </MarkdownContent>
@@ -508,17 +760,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
                             <div className="source-title">
                               {source.title}
                             </div>
-                            {source.description && (
-                              <div className="source-description">
-                                {source.description}
-                              </div>
-                            )}
-                            {source.relevance_score && (
-                              <div className="source-meta">
-                                <span>{Math.round(source.relevance_score * 100)}% relevant</span>
-                                <IconWrapper Icon={FiLink} size={12} />
-                              </div>
-                            )}
                           </div>
                           <div className="external-icon">
                             <IconWrapper Icon={FiExternalLink} size={16} />
@@ -529,6 +770,45 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
                   )}
                 </ModernSourcesContainer>
               )}
+
+              {/* Display experts if they exist */}
+              {message.role === 'assistant' && message.experts && message.experts.length > 0 && (
+                <ExpertsContainer>
+                  <ExpertsToggleButton
+                    isOpen={expertsOpen[message.id] || false}
+                    onClick={() => toggleExperts(message.id)}
+                  >
+                    <div className="toggle-left">
+                      <span>{message.multi_agent ? 'Expert Panel' : 'Expert'}</span>
+                      <span className="experts-count">{message.experts.length}</span>
+                    </div>
+                    {expertsOpen[message.id] ?
+                      <IconWrapper Icon={FiChevronUp} size={16} /> :
+                      <IconWrapper Icon={FiChevronDown} size={16} />
+                    }
+                  </ExpertsToggleButton>
+                  {expertsOpen[message.id] && (
+                    <ExpertsListContainer>
+                      {message.experts.map((expert, index) => (
+                        <ExpertItem key={index}>
+                          <div className="expert-icon">
+                            <IconWrapper Icon={FiUser} size={16} />
+                          </div>
+                          <div className="expert-content">
+                            <div className="expert-name">
+                              {expert.name}
+                            </div>
+                            <div className="expert-title">
+                              {expert.title}
+                            </div>
+                          </div>
+                        </ExpertItem>
+                      ))}
+                    </ExpertsListContainer>
+                  )}
+                </ExpertsContainer>
+              )}
+
               <div className="message-time">
                 {formatTime(message.created_at)}
               </div>

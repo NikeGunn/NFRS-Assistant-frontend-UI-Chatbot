@@ -281,9 +281,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log(`Sending message to API: ${content}`);
       const response = await chatService.sendMessage({
         conversation_id: conversationId,
-        content,
-        message: content, // Add message field that matches content
-        role: 'user',
+        message: content,
         language: language
       });
 
@@ -303,12 +301,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: 'assistant',
           content: (response as any).message || response.content, // Type assertion for message property
           created_at: new Date().toISOString(),
-          sources: response.sources ? response.sources.map(source => ({
-            id: source.id.toString(),
-            title: source.title,
-            description: source.title, // Use title as description if not available
-            relevance_score: 1.0
-          })) : undefined
+          sources: response.sources || [],
+          experts: response.experts || [],
+          multi_agent: response.multi_agent || false
         };
 
         // Use the typewriter effect
