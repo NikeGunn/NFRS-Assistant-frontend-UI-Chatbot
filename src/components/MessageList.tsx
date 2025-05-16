@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Message as MessageType, DocumentSource } from '../types/api.types';
-import { FiUser, FiExternalLink, FiChevronDown, FiChevronUp, FiFileText, FiLink } from 'react-icons/fi';
+import { FiUser, FiExternalLink, FiChevronDown, FiChevronUp, FiFileText, FiLink, FiUsers, FiAward } from 'react-icons/fi';
 import { RiRobot2Fill } from 'react-icons/ri';
 import IconWrapper from './IconWrapper';
 import { useChat } from '../context/ChatContext';
@@ -248,6 +248,126 @@ const ModernSourceItem = styled.a`
   }
 `;
 
+// Expert Panel component styling
+const ExpertPanelContainer = styled.div`
+  margin-top: 8px;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+`;
+
+const ExpertPanelToggleButton = styled.button<{ isOpen: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 16px;
+  background-color: ${props => props.isOpen ? '#f0f4f9' : 'white'};
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  color: #444;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+
+  &:hover {
+    background-color: #f0f4f9;
+  }
+
+  .toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .expert-label {
+    background-color: ${props => props.isOpen ? '#4a6bdc' : '#e9ecef'};
+    color: ${props => props.isOpen ? 'white' : '#495057'};
+    border-radius: 16px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  svg {
+    color: ${props => props.isOpen ? '#4a6bdc' : '#6b7280'};
+    transition: all 0.2s ease;
+  }
+`;
+
+const ExpertPanelContent = styled.div`
+  margin-top: 8px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e1e5e9;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+`;
+
+const ExpertList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const ExpertItem = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+`;
+
+const ExpertAvatar = styled.div`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #4a6bdc;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+`;
+
+const ExpertInfo = styled.div`
+  flex: 1;
+`;
+
+const ExpertName = styled.div`
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .expert-badge {
+    display: flex;
+    align-items: center;
+    color: #4a6bdc;
+  }
+`;
+
+const ExpertTitle = styled.div`
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+`;
+
+const ExpertComment = styled.div`
+  font-size: 13px;
+  color: #333;
+  line-height: 1.5;
+`;
+
 // Typing indicator shown when the AI is "thinking"
 const TypingIndicator = styled.div`
   display: flex;
@@ -396,10 +516,27 @@ interface MessageListProps {
   isLoading?: boolean;
 }
 
+// Mock expert data - in a real app, this would come from an API
+const experts = [
+  {
+    id: 1,
+    name: "Dr. Rajendra Sharma",
+    title: "Financial Reporting Specialist, ICAN",
+    comment: "This interpretation correctly applies NFRS 9 guidelines for financial instrument classification based on the business model and contractual cash flow characteristics."
+  },
+  {
+    id: 2,
+    name: "Maya Pradhan",
+    title: "Senior Accountant, Nepal Rastra Bank",
+    comment: "The explanation aligns with Nepal Rastra Bank's directives on financial instrument disclosure requirements for banking institutions."
+  }
+];
+
 const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { typingText } = useChat();
   const [sourcesOpen, setSourcesOpen] = useState<{ [key: string]: boolean }>({});
+  const [expertPanelOpen, setExpertPanelOpen] = useState<{ [key: string]: boolean }>({});
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -419,6 +556,14 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
   // Toggle sources visibility
   const toggleSources = (messageId: string) => {
     setSourcesOpen(prevState => ({
+      ...prevState,
+      [messageId]: !prevState[messageId]
+    }));
+  };
+
+  // Toggle expert panel visibility
+  const toggleExpertPanel = (messageId: string) => {
+    setExpertPanelOpen(prevState => ({
       ...prevState,
       [messageId]: !prevState[messageId]
     }));
@@ -529,6 +674,49 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
                   )}
                 </ModernSourcesContainer>
               )}
+
+              {/* Expert Panel - only show for assistant messages */}
+              {message.role === 'assistant' && (
+                <ExpertPanelContainer>
+                  <ExpertPanelToggleButton
+                    isOpen={expertPanelOpen[message.id] || false}
+                    onClick={() => toggleExpertPanel(message.id)}
+                  >
+                    <div className="toggle-left">
+                      <span>Expert Panel</span>
+                      <span className="expert-label">2 experts</span>
+                    </div>
+                    {expertPanelOpen[message.id] ?
+                      <IconWrapper Icon={FiChevronUp} size={16} /> :
+                      <IconWrapper Icon={FiChevronDown} size={16} />
+                    }
+                  </ExpertPanelToggleButton>
+                  {expertPanelOpen[message.id] && (
+                    <ExpertPanelContent>
+                      <ExpertList>
+                        {experts.map(expert => (
+                          <ExpertItem key={expert.id}>
+                            <ExpertAvatar>
+                              <IconWrapper Icon={FiUser} size={18} />
+                            </ExpertAvatar>
+                            <ExpertInfo>
+                              <ExpertName>
+                                {expert.name}
+                                <span className="expert-badge">
+                                  <IconWrapper Icon={FiAward} size={14} />
+                                </span>
+                              </ExpertName>
+                              <ExpertTitle>{expert.title}</ExpertTitle>
+                              <ExpertComment>{expert.comment}</ExpertComment>
+                            </ExpertInfo>
+                          </ExpertItem>
+                        ))}
+                      </ExpertList>
+                    </ExpertPanelContent>
+                  )}
+                </ExpertPanelContainer>
+              )}
+
               <div className="message-time">
                 {formatTime(message.created_at)}
               </div>

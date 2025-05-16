@@ -110,6 +110,7 @@ export interface TranslationResponse {
 }
 
 // Knowledge Types
+// Legacy Document type - keeping for backward compatibility
 export interface Document {
   id: number;
   title: string;
@@ -123,6 +124,36 @@ export interface Document {
   user: number;
 }
 
+// New Session Document types
+export interface SessionDocumentChunk {
+  id: number;
+  session_document: number;
+  content: string;
+  chunk_index: number;
+  page_number: number;
+  created_at: string;
+}
+
+export interface SessionDocument {
+  id: number;
+  title: string;
+  content_preview: string;
+  session_id: string;
+  chat_id: string | null;
+  file_type: string;
+  uploaded_by: number;
+  created_at: string;
+  chunks?: SessionDocumentChunk[];
+}
+
+export interface SessionDocumentsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: SessionDocument[];
+}
+
+// Legacy document responses - keeping for backward compatibility
 export interface DocumentsResponse {
   count: number;
   next: string | null;
@@ -144,6 +175,19 @@ export interface SearchResult {
   document_title: string;
   document_description: string;
   similarity_score: number;
+}
+
+// New Session Document search result
+export interface SessionSearchResult {
+  chunk: SessionDocumentChunk;
+  document_title: string;
+  similarity_score: number;
+}
+
+export interface SessionSearchResponse {
+  results: SessionSearchResult[];
+  query: string;
+  processing_time: number;
 }
 
 export interface VectorSearchResponse {
@@ -205,6 +249,7 @@ export interface CreateApiKeyRequest {
 export interface CreateConversationRequest {
   title: string;
   language: 'en' | 'ne';
+  session_id?: string; // Optional session ID for linking with documents
 }
 
 export interface UpdateConversationRequest {
@@ -227,6 +272,7 @@ export interface TranslationRequest {
 }
 
 // Knowledge Requests
+// Legacy document upload - keeping for backward compatibility
 export interface DocumentUploadRequest {
   file: File;
   title: string;
@@ -235,6 +281,28 @@ export interface DocumentUploadRequest {
   is_public: boolean;
   file_type: string;
   conversation_id?: number;
+}
+
+// New Session Document requests
+export interface SessionDocumentUploadRequest {
+  file: File;
+  session_id: string;
+  chat_id?: string;
+  title?: string;
+  file_type?: string;
+}
+
+export interface SessionDocumentSearchRequest {
+  query: string;
+  session_id: string;
+  chat_id?: string;
+  top_k?: number;
+}
+
+export interface SessionDocumentCleanupRequest {
+  session_id?: string;
+  chat_id?: string;
+  older_than_days?: number;
 }
 
 export interface UpdateDocumentRequest {

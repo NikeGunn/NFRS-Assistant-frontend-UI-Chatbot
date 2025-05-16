@@ -8,6 +8,8 @@ interface DocumentUploadModalProps {
   onClose: () => void;
   onUpload: (formData: FormData) => Promise<void>;
   isLoading: boolean;
+  sessionId: string;
+  chatId?: string;
 }
 
 const ModalOverlay = styled.div`
@@ -226,13 +228,12 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
   onClose,
   onUpload,
-  isLoading
+  isLoading,
+  sessionId,
+  chatId
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [language, setLanguage] = useState<'en' | 'ne'>('en');
-  const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -248,9 +249,10 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     if (files && files.length > 0) {
       const selectedFile = files[0];
 
-      // Check if file is PDF
-      if (selectedFile.type !== 'application/pdf') {
-        setError('Only PDF files are currently supported');
+      // Check if file is PDF, TXT, or DOCX
+      const validTypes = ['application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!validTypes.includes(selectedFile.type)) {
+        setError('Only PDF, TXT, or DOCX files are currently supported');
         return;
       }
 
@@ -283,19 +285,22 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', title);
-      formData.append('description', description);
-      formData.append('language', language);
-      formData.append('is_public', isPublic ? 'true' : 'false');
-      formData.append('file_type', 'pdf'); // Hardcoded to pdf for now as per requirements
+      formData.append('session_id', sessionId);
+
+      // Get file extension for determining file_type
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+      formData.append('file_type', fileExtension);
+
+      // Add chat_id if it exists
+      if (chatId) {
+        formData.append('chat_id', chatId);
+      }
 
       await onUpload(formData);
 
       // Reset form
       setFile(null);
       setTitle('');
-      setDescription('');
-      setLanguage('en');
-      setIsPublic(true);
       setError(null);
 
       // Close modal
@@ -320,12 +325,12 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         <Form onSubmit={handleSubmit}>
           <FileUploadArea onClick={handleFileClick}>
             <IconWrapper Icon={FiUploadCloud} size={32} />
-            <p>Click to select a PDF document</p>
+            <p>Click to select a document (PDF, TXT, DOCX)</p>
             <HiddenInput
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept=".pdf"
+              accept=".pdf,.txt,.docx"
             />
           </FileUploadArea>
 
@@ -335,7 +340,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 <IconWrapper Icon={FiFile} size={24} />
               </div>
               <div className="file-name">{file.name}</div>
-              <div className="file-type">PDF</div>
+              <div className="file-type">{file.name.split('.').pop()?.toUpperCase()}</div>
             </FilePreview>
           )}
 
@@ -347,38 +352,6 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               required
             />
-          </FormGroup>
-
-          <FormGroup>
-            <Label htmlFor="description">Description</Label>
-            <TextArea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </FormGroup>
-
-          <FormGroup>
-            <Label htmlFor="language">Language</Label>
-            <Select
-              id="language"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as 'en' | 'ne')}
-            >
-              <option value="en">English</option>
-              <option value="ne">Nepali</option>
-            </Select>
-          </FormGroup>
-
-          <FormGroup>
-            <CheckboxLabel>
-              <Checkbox
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-              />
-              Make document public
-            </CheckboxLabel>
           </FormGroup>
 
           {error && <ErrorMessage>{error}</ErrorMessage>}

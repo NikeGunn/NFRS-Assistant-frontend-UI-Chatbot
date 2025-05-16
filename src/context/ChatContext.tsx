@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Conversation, Message, DocumentSource } from '../types/api.types';
+import { Conversation, Message, DocumentSource, SessionDocument } from '../types/api.types';
 import { chatService, knowledgeService } from '../services/api.service';
 import { useAuth } from './AuthContext';
+import { v4 as uuidv4 } from 'uuid'; // Make sure to install uuid package if not already present
 
 interface ChatContextType {
   conversations: Conversation[];
@@ -13,6 +14,8 @@ interface ChatContextType {
   typingText: string | null; // Add typing text state for typewriter effect
   isMockMode: boolean; // Add isMockMode to the interface
   mockMessages: Record<number, Message[]>; // Add mockMessages to the interface
+  sessionId: string;
+  sessionDocuments: SessionDocument[];
   setLanguage: (lang: 'en' | 'ne') => void;
   createNewConversation: (title: string) => Promise<number>;
   selectConversation: (id: number) => Promise<void>;
@@ -22,6 +25,8 @@ interface ChatContextType {
   uploadDocument: (formData: FormData) => Promise<void>; // Change from File to FormData
   translateMessage: (text: string, sourceLang: 'en' | 'ne', targetLang: 'en' | 'ne') => Promise<string>;
   refreshConversations: () => Promise<void>; // Add refreshConversations function to interface
+  getSessionDocuments: () => Promise<void>;
+  generateNewSessionId: () => string;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -40,6 +45,24 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isMockMode, setIsMockMode] = useState<boolean>(false); // Setting to false to disable mock mode
   const [language, setLanguage] = useState<'en' | 'ne'>('en');
   const [typingText, setTypingText] = useState<string | null>(null); // Typewriter effect state
+  const [sessionId, setSessionId] = useState<string>(() => {
+    // Try to get session ID from localStorage or create a new one
+    const storedSessionId = localStorage.getItem('chat_session_id');
+    if (storedSessionId) return storedSessionId;
+
+    const newSessionId = uuidv4();
+    localStorage.setItem('chat_session_id', newSessionId);
+    return newSessionId;
+  });
+  const [sessionDocuments, setSessionDocuments] = useState<SessionDocument[]>([]);
+
+  // Generate a new session ID - useful when starting a new conversation
+  const generateNewSessionId = (): string => {
+    const newSessionId = uuidv4();
+    setSessionId(newSessionId);
+    localStorage.setItem('chat_session_id', newSessionId);
+    return newSessionId;
+  };
 
   // Load user conversations when user changes
   useEffect(() => {
@@ -74,6 +97,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     fetchUserConversations();
   }, [user]);
+
+  // Load session documents
+  useEffect(() => {
+    if (sessionId) {
+      getSessionDocuments();
+    }
+  }, [sessionId]);
 
   // Enhanced typewriter effect function with fast hacker-style typing
   const typewriterEffect = (text: string, onComplete: (fullText: string) => void) => {
@@ -115,10 +145,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
+      // Generate new session ID for a new conversation
+      const newSessionId = generateNewSessionId();
+
       // Always use the real API endpoint
       const response = await chatService.createConversation({
         title,
-        language
+        language,
+        session_id: newSessionId // Pass session_id to link conversation with documents
       });
 
       // Create a properly structured conversation object with all required properties
@@ -149,6 +183,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setConversations(prevConversations => [newConversation, ...prevConversations]);
       setCurrentConversation(newConversation);
       setMessages([]);
+
+      // Reset session documents for the new conversation
+      setSessionDocuments([]);
 
       return response.id;
     } catch (error: any) {
@@ -381,31 +418,37 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const uploadDocument = async (formData: FormData): Promise<void> => {
-    if (!currentConversation) {
-      throw new Error('No active conversation');
-    }
-
     setIsLoading(true);
     setError(null);
     try {
-      // Make sure conversation_id is added to the form data if not already present
-      if (!formData.has('conversation_id')) {
-        formData.append('conversation_id', currentConversation.id.toString());
+      // Add session ID to the form data
+      if (!formData.has('session_id')) {
+        formData.append('session_id', sessionId);
       }
 
-      // Always use the real API for document uploads
-      const document = await knowledgeService.uploadDocument(formData);
+      // Add chat_id if there's a current conversation
+      if (currentConversation && !formData.has('chat_id')) {
+        formData.append('chat_id', currentConversation.id.toString());
+      }
 
-      // Add a user message indicating document upload
-      const userMessage: Message = {
-        id: `user-doc-${Date.now()}`,
-        conversation_id: currentConversation.id,
-        role: 'user' as const,
-        content: `Uploaded document: ${document.title || formData.get('title') || 'Document'}`,
-        created_at: new Date().toISOString()
-      };
+      // Use the new session document upload API
+      const document = await knowledgeService.uploadSessionDocument(formData);
 
-      setMessages(prev => [...prev, userMessage]);
+      // Refresh the session documents list
+      await getSessionDocuments();
+
+      // Add a user message indicating document upload if we have an active conversation
+      if (currentConversation) {
+        const userMessage: Message = {
+          id: `user-doc-${Date.now()}`,
+          conversation_id: currentConversation.id,
+          role: 'user' as const,
+          content: `Uploaded document: ${document.title || formData.get('title') || 'Document'}`,
+          created_at: new Date().toISOString()
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+      }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
@@ -413,6 +456,27 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError(errorMessage);
       console.error('Error uploading document:', error);
       throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getSessionDocuments = async (): Promise<void> => {
+    if (!sessionId) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch documents for the current session
+      const chatId = currentConversation?.id?.toString();
+      const response = await knowledgeService.getSessionDocuments(sessionId, chatId);
+      setSessionDocuments(response.results || []);
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to fetch session documents';
+      setError(errorMessage);
+      console.error('Error fetching session documents:', error);
     } finally {
       setIsLoading(false);
     }
@@ -481,6 +545,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       typingText, // Add typing text to context
       isMockMode, // Add isMockMode to context
       mockMessages: MOCK_MESSAGES, // Add mockMessages to context
+      sessionId,
+      sessionDocuments,
       setLanguage,
       createNewConversation,
       selectConversation,
@@ -489,7 +555,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       sendMessage,
       uploadDocument,
       translateMessage,
-      refreshConversations
+      refreshConversations,
+      getSessionDocuments,
+      generateNewSessionId
     }}>
       {children}
     </ChatContext.Provider>

@@ -176,7 +176,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const MAX_LENGTH = 4000;
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
-  const { uploadDocument } = useChat();
+  const { uploadDocument, sessionId, currentConversation } = useChat();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -320,6 +320,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
         onClose={() => setIsDocumentModalOpen(false)}
         onUpload={handleDocumentUpload}
         isLoading={isLoading}
+        sessionId={sessionId}
+        chatId={currentConversation?.id?.toString()}
       />
 
       <DisclaimerText>

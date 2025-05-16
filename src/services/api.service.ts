@@ -25,7 +25,12 @@ import {
   DocumentUploadRequest,
   VectorSearchRequest,
   VectorIndex,
-  UpdateConversationRequest
+  UpdateConversationRequest,
+  SessionDocumentsResponse,
+  SessionDocument,
+  SessionDocumentSearchRequest,
+  SessionSearchResponse,
+  SessionDocumentCleanupRequest
 } from '../types/api.types';
 
 // Configure the API
@@ -199,6 +204,7 @@ export const chatService = {
 
 // Knowledge API Service
 export const knowledgeService = {
+  // Legacy document methods - keeping for backward compatibility
   getDocuments: async (): Promise<DocumentsResponse> => {
     const response = await apiClient.get<DocumentsResponse>('/knowledge/documents/');
     return response.data;
@@ -250,6 +256,7 @@ export const knowledgeService = {
     await apiClient.delete(`/knowledge/documents/${documentId}/`);
   },
 
+  // Vector search methods
   vectorSearch: async (searchData: VectorSearchRequest): Promise<VectorSearchResponse[]> => {
     const response = await apiClient.post<VectorSearchResponse[]>('/knowledge/search/', searchData);
     return response.data;
@@ -267,6 +274,50 @@ export const knowledgeService = {
 
   rebuildVectorIndex: async (): Promise<void> => {
     await apiClient.post('/knowledge/indices/rebuild/');
+  },
+
+  // New Session Document API methods
+  getSessionDocuments: async (sessionId: string, chatId?: string): Promise<SessionDocumentsResponse> => {
+    let url = `/knowledge/session-documents/?session_id=${sessionId}`;
+    if (chatId) {
+      url += `&chat_id=${chatId}`;
+    }
+    const response = await apiClient.get<SessionDocumentsResponse>(url);
+    return response.data;
+  },
+
+  getSessionDocumentDetails: async (documentId: number): Promise<SessionDocument> => {
+    const response = await apiClient.get<SessionDocument>(`/knowledge/session-documents/${documentId}/`);
+    return response.data;
+  },
+
+  uploadSessionDocument: async (documentData: FormData): Promise<SessionDocument> => {
+    const config: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    };
+
+    const response = await apiClient.post<SessionDocument>(
+      '/knowledge/session-documents/',
+      documentData,
+      config
+    );
+
+    return response.data;
+  },
+
+  deleteSessionDocument: async (documentId: number): Promise<void> => {
+    await apiClient.delete(`/knowledge/session-documents/${documentId}/`);
+  },
+
+  searchSessionDocuments: async (searchData: SessionDocumentSearchRequest): Promise<SessionSearchResponse> => {
+    const response = await apiClient.post<SessionSearchResponse>('/knowledge/session-documents/search/', searchData);
+    return response.data;
+  },
+
+  cleanupSessionDocuments: async (cleanupData: SessionDocumentCleanupRequest): Promise<void> => {
+    await apiClient.post('/knowledge/session-documents/cleanup/', cleanupData);
   }
 };
 
