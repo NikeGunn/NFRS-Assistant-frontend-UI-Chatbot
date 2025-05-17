@@ -199,7 +199,11 @@ export const chatService = {
   translateText: async (translateData: TranslationRequest): Promise<TranslationResponse> => {
     const response = await apiClient.post<TranslationResponse>('/chat/translate/', translateData);
     return response.data;
-  }
+  },
+  createMessage: async (messageData: Partial<Message>): Promise<Message> => {
+    const response = await apiClient.post('/chat/messages/', messageData);
+    return response.data;
+  },
 };
 
 // Knowledge API Service
@@ -255,10 +259,9 @@ export const knowledgeService = {
   deleteDocument: async (documentId: number): Promise<void> => {
     await apiClient.delete(`/knowledge/documents/${documentId}/`);
   },
-
   // Vector search methods
   vectorSearch: async (searchData: VectorSearchRequest): Promise<VectorSearchResponse[]> => {
-    const response = await apiClient.post<VectorSearchResponse[]>('/knowledge/search/', searchData);
+    const response = await apiClient.post<VectorSearchResponse[]>('/knowledge/search/vector/', searchData);
     return response.data;
   },
 

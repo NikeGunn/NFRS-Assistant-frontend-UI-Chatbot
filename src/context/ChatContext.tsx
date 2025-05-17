@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Conversation, Message, DocumentSource, SessionDocument } from '../types/api.types';
+import {
+  Conversation,
+  Message,
+  DocumentSource,
+  SessionDocument,
+  VectorSearchResponse,
+  VectorSearchRequest,
+  SendMessageRequest
+} from '../types/api.types';
 import { chatService, knowledgeService } from '../services/api.service';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid'; // Make sure to install uuid package if not already present
@@ -27,6 +35,7 @@ interface ChatContextType {
   refreshConversations: () => Promise<void>; // Add refreshConversations function to interface
   getSessionDocuments: () => Promise<void>;
   generateNewSessionId: () => string;
+  performVectorSearch: (query: string, topK?: number, useFusion?: boolean) => Promise<VectorSearchResponse[]>; // Add performVectorSearch to interface
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -306,7 +315,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Add user message to UI immediately for better UX
       const userMessage: Message = {
         id: tempId,
-        conversation_id: conversationId,
+        conversation: conversationId, // CHANGE THIS LINE
         role: 'user',
         content,
         created_at: new Date().toISOString()
@@ -331,21 +340,20 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ...msg,
             id: `user-${Date.now()}` // Since backend might not return ID for user message
           } : msg)
-        );
-
-        // Format the assistant's response as a Message
+        );          // Format the assistant's response as a Message
         const assistantMessage: Message = {
           id: `assistant-${Date.now()}`,
-          conversation_id: conversationId,
+          conversation: conversationId,
           role: 'assistant',
           content: (response as any).message || response.content, // Type assertion for message property
           created_at: new Date().toISOString(),
           sources: response.sources ? response.sources.map(source => ({
-            id: source.id.toString(),
-            title: source.title,
-            description: source.title, // Use title as description if not available
-            relevance_score: 1.0
-          })) : undefined
+            id: source.id ? source.id.toString() : `src-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            title: source.title || "Document Reference",
+            description: source.description || source.title || "Referenced content",
+            relevance_score: source.relevance_score || 1.0
+          })) : undefined,
+          experts_used: response.experts_used || undefined
         };
 
         // Use the typewriter effect
@@ -378,7 +386,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Replace the temporary message with a "real" one (in a real app, this would come from the server)
     const realUserMessage: Message = {
       id: Math.random().toString(36).substring(2, 15),
-      conversation_id: currentConversation!.id,
+      conversation: currentConversation!.id,
       role: 'user' as const,
       content: userMessage,
       created_at: new Date().toISOString()
@@ -408,7 +416,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Add the assistant's response
     const assistantMessage: Message = {
       id: Math.random().toString(36).substring(2, 15),
-      conversation_id: currentConversation!.id,
+      conversation: currentConversation!.id,
       role: 'assistant' as const,
       content: responseContent,
       created_at: new Date().toISOString()
@@ -417,15 +425,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setMessages(prev => [...prev, assistantMessage]);
   };
 
+
+  // Replace the existing uploadDocument function with this fixed version
+
   const uploadDocument = async (formData: FormData): Promise<void> => {
     setIsLoading(true);
     setError(null);
     try {
-      // Add session ID to the form data
-      if (!formData.has('session_id')) {
-        formData.append('session_id', sessionId);
-      }
-
       // Add chat_id if there's a current conversation
       if (currentConversation && !formData.has('chat_id')) {
         formData.append('chat_id', currentConversation.id.toString());
@@ -433,21 +439,77 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Use the new session document upload API
       const document = await knowledgeService.uploadSessionDocument(formData);
+      console.log('Uploaded document:', document); // Debug log
 
       // Refresh the session documents list
       await getSessionDocuments();
 
       // Add a user message indicating document upload if we have an active conversation
       if (currentConversation) {
-        const userMessage: Message = {
-          id: `user-doc-${Date.now()}`,
+        // Create and send user message for document upload
+        const userMessageContent = `📄 Uploaded document: ${document.title}`;
+        
+        const userMessageRequest: SendMessageRequest = {
+          role: 'user',
+          content: userMessageContent,
+          message: userMessageContent,
           conversation_id: currentConversation.id,
-          role: 'user' as const,
-          content: `Uploaded document: ${document.title || formData.get('title') || 'Document'}`,
-          created_at: new Date().toISOString()
         };
 
+        const createMessageResponse = await chatService.createMessage(userMessageRequest);
+
+        const userMessage: Message = {
+          id: createMessageResponse.id || `upload-${Date.now()}`,
+          conversation: currentConversation.id,
+          role: 'user',
+          content: userMessageContent,
+          created_at: document.created_at || new Date().toISOString()
+        };
+
+        // Update UI with user message
         setMessages(prev => [...prev, userMessage]);
+
+        // Handle document summary if available
+        const summary = document.document_summary || document.summary;
+        if (summary) {
+          // Create document source
+          const documentSource: DocumentSource = {
+            id: document.id.toString(),
+            title: document.title,
+            description: document.content_preview || 'Document preview',
+            relevance_score: 1.0
+          };
+
+          // Send assistant message with summary
+          const summaryRequest: SendMessageRequest = {
+            role: 'assistant',
+            content: summary,
+            message: summary,
+            conversation_id: currentConversation.id,
+          };
+
+          const createSummaryResponse = await chatService.createMessage(summaryRequest);
+
+          const assistantMessage: Message = {
+            id: createSummaryResponse.id || `summary-${Date.now()}`,
+            conversation: currentConversation.id,
+            role: 'assistant',
+            content: summary,
+            created_at: new Date().toISOString(),
+            sources: [documentSource], // Add the document as a source
+            experts_used: document.experts_used
+          };
+
+          // Use typewriter effect for the summary
+          typewriterEffect(summary, (fullText) => {
+            setTypingText(null);
+            setMessages(prev => [...prev, {
+              ...assistantMessage,
+              content: fullText,
+              sources: [documentSource] // Ensure source is preserved after typewriter effect
+            }]);
+          });
+        }
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
@@ -534,6 +596,28 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Vector search with fusion capability
+  const performVectorSearch = async (query: string, topK: number = 5, useFusion: boolean = true): Promise<VectorSearchResponse[]> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await knowledgeService.vectorSearch({
+        query,
+        top_k: topK,
+        use_fusion: useFusion
+      });
+      return result;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to perform vector search';
+      setError(errorMessage);
+      console.error('Error during vector search:', error);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <ChatContext.Provider value={{
       conversations,
@@ -552,12 +636,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       selectConversation,
       updateConversation,
       deleteConversation,
-      sendMessage,
-      uploadDocument,
+      sendMessage, uploadDocument,
       translateMessage,
       refreshConversations,
       getSessionDocuments,
-      generateNewSessionId
+      generateNewSessionId,
+      performVectorSearch // Add performVectorSearch to context
     }}>
       {children}
     </ChatContext.Provider>

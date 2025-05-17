@@ -84,11 +84,17 @@ export interface ConversationDetail extends Conversation {
 
 export interface Message {
   id: string;
-  conversation_id: number;
-  role: 'user' | 'assistant';
   content: string;
+  role: 'user' | 'assistant' | 'system';
   created_at: string;
+  parent_message?: string | null;
+  conversation?: number;
   sources?: DocumentSource[];
+  experts_used?: {
+    name: string;
+    title: string;
+    description?: string;
+  }[];
 }
 
 export interface MessagesResponse {
@@ -134,6 +140,12 @@ export interface SessionDocumentChunk {
   created_at: string;
 }
 
+export interface Expert {
+  name: string;
+  title: string;
+  description?: string;
+}
+
 export interface SessionDocument {
   id: number;
   title: string;
@@ -144,6 +156,11 @@ export interface SessionDocument {
   uploaded_by: number;
   created_at: string;
   chunks?: SessionDocumentChunk[];
+  status?: string;
+  message?: string;
+  summary?: string;
+  document_summary?: string;
+  experts_used?: Expert[];
 }
 
 export interface SessionDocumentsResponse {
@@ -315,4 +332,5 @@ export interface VectorSearchRequest {
   query: string;
   top_k?: number;
   filter_document_ids?: number[];
+  use_fusion?: boolean;
 }

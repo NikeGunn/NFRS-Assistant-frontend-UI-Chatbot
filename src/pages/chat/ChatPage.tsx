@@ -722,36 +722,35 @@ const ChatPage: React.FC = () => {
               isLoading={isLoading}
             />
           </div>
-        ) : (
-          <EnhancedChatContainer>
-            <ChatHeader>
-              <ChatTitle>
-                {isEditingTitle ? (
-                  <>
-                    <TitleInput
-                      value={titleInput}
-                      onChange={(e) => setTitleInput(e.target.value)}
-                      onBlur={handleSaveTitle}
-                      onKeyDown={handleTitleKeyDown}
-                      autoFocus
-                    />
-                  </>
-                ) : (
-                  <>
-                    {/* No title or buttons here for a cleaner interface */}
-                  </>
-                )}
-              </ChatTitle>
-            </ChatHeader>
+        ) : (<EnhancedChatContainer>
+          <ChatHeader>
+            <ChatTitle>
+              {isEditingTitle ? (
+                <>
+                  <TitleInput
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    onBlur={handleSaveTitle}
+                    onKeyDown={handleTitleKeyDown}
+                    autoFocus
+                  />
+                </>
+              ) : (
+                <>
+                  {/* No title or buttons here for a cleaner interface */}
+                </>
+              )}
+            </ChatTitle>
+          </ChatHeader>
 
-            <MessageList messages={messages} />
+          {messages && <MessageList messages={messages} isLoading={isLoading} />}
 
-            <ChatInput
-              onSendMessage={handleSendMessage}
-              onFileUpload={handleDocumentUpload}
-              isLoading={isLoading}
-            />
-          </EnhancedChatContainer>
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            onFileUpload={handleDocumentUpload}
+            isLoading={isLoading}
+          />
+        </EnhancedChatContainer>
         )}
       </MainContent>
 
