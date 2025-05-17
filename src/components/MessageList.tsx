@@ -1150,11 +1150,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
             </div>
           </div>
         </MessageBubble>
-      ))}
-
-      {/* Show the typing indicator when assistant is responding */}
+      ))}      {/* Show the typing indicator when assistant is responding with text */}
       {typingText && (
-        <MessageBubble isUser={false}>
+        <MessageBubble isUser={false} key="typing-animation">
           <div className="user-name">
             NFRS Assistant
           </div>
@@ -1171,7 +1169,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading = false }
         </MessageBubble>
       )}
 
-      {/* Show typing indicator dots when loading but no text yet */}
+      {/* Show typing indicator dots only when loading and there's no typingText yet */}
       {isLoading && !typingText && (
         <TypingIndicator>
           <div className="avatar">

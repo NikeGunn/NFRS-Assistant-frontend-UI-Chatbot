@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiX, FiUploadCloud, FiFile } from 'react-icons/fi';
 import IconWrapper from './IconWrapper';
@@ -12,7 +12,7 @@ interface DocumentUploadModalProps {
   chatId?: string;
 }
 
-const ModalOverlay = styled.div`
+const ModalOverlay = styled.div<{ isClosing: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
@@ -23,9 +23,11 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  opacity: ${props => props.isClosing ? 0 : 1};
+  transition: opacity 0.2s ease-in-out;
 `;
 
-const ModalContainer = styled.div`
+const ModalContainer = styled.div<{ isClosing: boolean }>`
   background-color: white;
   border-radius: 8px;
   width: 90%;
@@ -34,6 +36,9 @@ const ModalContainer = styled.div`
   overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 24px;
+  transform: ${props => props.isClosing ? 'scale(0.95) translateY(10px)' : 'scale(1) translateY(0)'};
+  opacity: ${props => props.isClosing ? 0 : 1};
+  transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
 `;
 
 const ModalHeader = styled.div`
@@ -59,10 +64,15 @@ const CloseButton = styled.button`
   justify-content: center;
   padding: 6px;
   border-radius: 4px;
+  opacity: ${props => props.disabled ? 0.5 : 1};
 
   &:hover {
     background-color: #f7f7f8;
     color: #202123;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
   }
 `;
 
@@ -89,35 +99,6 @@ const Input = styled.input`
   border: 1px solid #e5e5e5;
   border-radius: 6px;
   font-size: 14px;
-
-  &:focus {
-    outline: none;
-    border-color: #10A37F;
-    box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.1);
-  }
-`;
-
-const TextArea = styled.textarea`
-  padding: 10px 12px;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  font-size: 14px;
-  min-height: 80px;
-  resize: vertical;
-
-  &:focus {
-    outline: none;
-    border-color: #10A37F;
-    box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.1);
-  }
-`;
-
-const Select = styled.select`
-  padding: 10px 12px;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  font-size: 14px;
-  background-color: white;
 
   &:focus {
     outline: none;
@@ -184,19 +165,7 @@ const HiddenInput = styled.input`
   display: none;
 `;
 
-const Checkbox = styled.input`
-  margin-right: 8px;
-`;
-
-const CheckboxLabel = styled.label`
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  color: #202123;
-  cursor: pointer;
-`;
-
-const SubmitButton = styled.button`
+const SubmitButton = styled.button<{ isLoading: boolean }>`
   padding: 10px 16px;
   background-color: #10A37F;
   color: white;
@@ -205,7 +174,12 @@ const SubmitButton = styled.button`
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s;
+  transform: ${props => props.isLoading ? 'scale(0.98)' : 'scale(1)'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 
   &:hover {
     background-color: #0c8a6b;
@@ -215,6 +189,7 @@ const SubmitButton = styled.button`
     background-color: #e5e5e5;
     color: #a0aec0;
     cursor: not-allowed;
+    transform: none;
   }
 `;
 
@@ -235,8 +210,33 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFile(null);
+      setTitle('');
+      setError(null);
+      setIsClosing(false);
+    }
+  }, [isOpen]);
+  const handleClose = () => {
+    if (!isLoading) {
+      setIsClosing(true);
+      setTimeout(() => {
+        onClose();
+        // Reset the modal state after it's closed
+        setTimeout(() => {
+          setIsClosing(false);
+          setFile(null);
+          setTitle('');
+          setError(null);
+        }, 50);
+      }, 200);
+    }
+  };
 
   const handleFileClick = () => {
     if (fileInputRef.current) {
@@ -267,7 +267,6 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setError(null);
     }
   };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -296,6 +295,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('chat_id', chatId);
       }
 
+      // Upload the document
       await onUpload(formData);
 
       // Reset form
@@ -303,8 +303,10 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setTitle('');
       setError(null);
 
-      // Close modal
-      onClose();
+      // Close modal with animation - delay for better feedback to user
+      setTimeout(() => {
+        handleClose();
+      }, 300);
     } catch (error: any) {
       setError(error.message || 'An error occurred while uploading the document');
     }
@@ -313,11 +315,11 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <ModalOverlay onClick={() => !isLoading && onClose()}>
-      <ModalContainer onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay isClosing={isClosing} onClick={handleClose}>
+      <ModalContainer isClosing={isClosing} onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <h2>Upload Document</h2>
-          <CloseButton onClick={onClose} disabled={isLoading}>
+          <CloseButton onClick={handleClose} disabled={isLoading}>
             <IconWrapper Icon={FiX} size={20} />
           </CloseButton>
         </ModalHeader>
@@ -356,8 +358,15 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
           {error && <ErrorMessage>{error}</ErrorMessage>}
 
-          <SubmitButton type="submit" disabled={isLoading}>
-            {isLoading ? 'Uploading...' : 'Upload Document'}
+          <SubmitButton type="submit" disabled={isLoading} isLoading={isLoading}>
+            {isLoading ? (
+              <>
+                <span>Uploading...</span>
+                <span className="loading-dots">...</span>
+              </>
+            ) : (
+              'Upload Document'
+            )}
           </SubmitButton>
         </Form>
       </ModalContainer>

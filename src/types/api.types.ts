@@ -95,6 +95,7 @@ export interface Message {
     title: string;
     description?: string;
   }[];
+  thinkingStage?: number;  // Add optional thinking stage for animated responses
 }
 
 export interface MessagesResponse {

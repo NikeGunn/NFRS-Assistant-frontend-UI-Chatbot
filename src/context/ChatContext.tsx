@@ -114,40 +114,153 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [sessionId]);
 
-  // Enhanced typewriter effect function with fast hacker-style typing
-  const typewriterEffect = (text: string, onComplete: (fullText: string) => void) => {
+  // Helper function to generate a unique string ID
+  const generateId = (prefix: string = '') => {
+    return `${prefix}${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  };
+  // Helper function to ensure message ID is always a string
+  const ensureStringId = (id: number | string | undefined): string => {
+    if (id === null || typeof id === 'undefined') return generateId();
+    return typeof id === 'string' ? id : id.toString();
+  };
+  // Enhanced thinking message generator
+  const generateThinkingMessage = (conversationId: number): Message => ({
+    id: generateId('thinking-'),
+    conversation: conversationId,
+    role: 'assistant',
+    content: "🤔 Analyzing document...\n[===>          ]",
+    created_at: new Date().toISOString(),
+    thinkingStage: 0
+  });
+
+  // Create an array of thinking stages with more variation for smoother animation
+  const thinkingStages = [
+    "🤔 Analyzing document...\n[===>          ]",
+    "🤔 Analyzing document...\n[=====>        ]",
+    "🧠 Processing content...\n[=======>      ]",
+    "🧠 Processing content...\n[========>     ]",
+    "✨ Generating summary...\n[==========>   ]",
+    "✨ Generating summary...\n[===========>  ]",
+    "📝 Preparing response...\n[============> ]",
+    "📝 Preparing response...\n[=============>]"
+  ];
+    // Helper function to cleanup thinking/typing messages
+  const cleanupThinkingMessages = () => {
+    setMessages(prev => prev.filter(msg => {
+      const id = msg.id;
+      // Safe check: ensure id is a string before calling startsWith
+      return !(typeof id === 'string' &&
+        (id.startsWith('thinking-') || id.startsWith('typing-')));
+    }));
+  };  // Improved and fixed typewriter effect that updates a single message in-place
+  const typewriterEffect = (text: string, onComplete: (fullText: string) => void, updateThinking?: (stage: number) => void) => {
+    // Clear any existing typing text to avoid duplication issues
+    setTypingText(null);
+
+    // Clean up any existing typing/thinking messages first
+    cleanupThinkingMessages();
+
     let currentIndex = 0;
-    setTypingText("");
+    const totalLength = text.length;
+    let isAborted = false;
 
-    // Create variable typing speeds for a more hacker-like effect
+    // Safety timeout - ensure completion even if animation breaks
+    const safetyTimeout = setTimeout(() => {
+      if (!isAborted && currentIndex < totalLength) {
+        isAborted = true;
+        console.log('Typewriter effect timed out - forcing completion');
+        // Final update with complete text
+        setTypingText(null);
+        onComplete(text);
+      }
+    }, 10000); // 10 second timeout as safety
+
+    // Adaptive typing speed - faster for longer content
     const getTypingDelay = () => {
-      // Very rarely add a tiny pause (simulating network lag or processing)
-      if (Math.random() < 0.01) return 20 + Math.random() * 30;
+      // Base the typing speed on content length - faster for longer content
+      const baseSpeed = Math.max(2, 10 - Math.floor(totalLength / 300));
 
-      // Super fast typing for most characters (hacker speed)
-      return Math.random() < 0.7 ? 1 : 2 + Math.random() * 3;
+      // Add slight natural pauses at punctuation
+      if (currentIndex < totalLength && /[.,!?;:]/.test(text[currentIndex])) {
+        return Math.random() * 50 + 20; // Pause at punctuation
+      }
+
+      // Slight randomness for natural feel
+      return baseSpeed + (Math.random() * 2);
+    };
+
+    // Create typing indicator with initial character
+    const initializeTyping = () => {
+      // Small delay before starting to type
+      setTimeout(() => {
+        // Set the typing text state instead of adding a new message
+        setTypingText(text.substring(0, 1));
+
+        // Start typing the rest
+        typeNextChar();
+      }, 200);
     };
 
     const typeNextChar = () => {
-      if (currentIndex < text.length) {
-        // Type larger chunks of characters for rapid typing effect
-        const chunkSize = Math.floor(Math.random() * 8) + 3; // Type 3-10 characters at once
-        const chunk = text.substr(currentIndex, Math.min(chunkSize, text.length - currentIndex));
+      if (isAborted) return;
 
-        setTypingText(prev => prev + chunk);
-        currentIndex += chunk.length;
+      if (currentIndex < totalLength) {
+        const progress = currentIndex / totalLength;
 
-        // Schedule the next chunk with variable delay
-        setTimeout(typeNextChar, getTypingDelay());
+        // Update thinking stage based on progress
+        if (updateThinking) {
+          const stageIndex = Math.min(Math.floor(progress * thinkingStages.length), thinkingStages.length - 1);
+          updateThinking(stageIndex);        }
+
+        // Dynamically adjust chunk size based on content length
+        // For longer content, type faster by using larger chunks
+        const chunkSize = Math.max(
+          1,
+          Math.min(
+            5, // Max chunk size
+            Math.floor(totalLength / 300) // Adaptive chunk size
+          )
+        );
+
+        currentIndex = Math.min(currentIndex + chunkSize, totalLength);
+
+        // Update the typing text state
+        setTypingText(text.substring(0, currentIndex));
+
+        // Only schedule next update if not at the end
+        if (currentIndex < totalLength) {
+          setTimeout(typeNextChar, getTypingDelay());
+        } else {
+          // Typing complete
+          clearTimeout(safetyTimeout);
+          isAborted = true;
+          // Small delay before removing typing text to ensure UI smoothness
+          setTimeout(() => {
+            setTypingText(null);
+            onComplete(text);
+          }, 50);
+        }
       } else {
         // Typing complete
-        onComplete(text);
+        clearTimeout(safetyTimeout);
+        isAborted = true;
         setTypingText(null);
+        onComplete(text);
       }
     };
 
     // Start the typing effect
-    typeNextChar();
+    initializeTyping();
+
+    // Return an abort function
+    return () => {
+      if (!isAborted) {
+        isAborted = true;
+        clearTimeout(safetyTimeout);
+        setTypingText(null);
+        onComplete(text);
+      }
+    };
   };
 
   const createNewConversation = async (title: string): Promise<number> => {
@@ -331,24 +444,22 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         message: content, // Add message field that matches content
         role: 'user',
         language: language
-      });
-
-      if (response) {
+      });      if (response) {
         // Replace the temporary message with a properly formatted user message
         setMessages(prev =>
           prev.map(msg => msg.id === tempId ? {
             ...msg,
-            id: `user-${Date.now()}` // Since backend might not return ID for user message
+            id: generateId('user-') // Use our consistent ID generator
           } : msg)
-        );          // Format the assistant's response as a Message
+        );        // Format the assistant's response as a Message
         const assistantMessage: Message = {
-          id: `assistant-${Date.now()}`,
+          id: generateId('assistant-'),
           conversation: conversationId,
           role: 'assistant',
           content: (response as any).message || response.content, // Type assertion for message property
           created_at: new Date().toISOString(),
           sources: response.sources ? response.sources.map(source => ({
-            id: source.id ? source.id.toString() : `src-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            id: ensureStringId(source.id) || generateId('src-'),
             title: source.title || "Document Reference",
             description: source.description || source.title || "Referenced content",
             relevance_score: source.relevance_score || 1.0
@@ -356,36 +467,73 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           experts_used: response.experts_used || undefined
         };
 
-        // Use the typewriter effect
-        typewriterEffect(assistantMessage.content, (fullText) => {
-          // Replace with actual message once typing is complete
-          setTypingText(null);
-          setMessages(prev => [...prev, {
-            ...assistantMessage,
-            content: fullText
-          }]);
-          setIsLoading(false);
-        });
-      }
-    } catch (error: any) {
+        // First, add the placeholder message (will be shown as typing)        // First, clean up any existing thinking/typing messages
+        cleanupThinkingMessages();
+
+        // Use the improved typewriter effect directly without creating a placeholder message first
+        const abortTyping = typewriterEffect(
+          assistantMessage.content,
+          (fullText) => {
+            // After typing animation completes, add the final message
+            setMessages(prev => [
+              // Keep all regular messages (filter out any temporary ones)
+              ...prev.filter(msg => {
+                const id = msg.id;
+                return !(typeof id === 'string' &&
+                  (id.startsWith('thinking-') || id.startsWith('typing-') || id.startsWith('temp-'))
+                );
+              }),
+              // Add final message with complete content
+              { ...assistantMessage, content: fullText }
+            ]);
+            setIsLoading(false);
+          }
+        );
+
+        // Set a safety timeout
+        setTimeout(() => {
+          abortTyping();
+        }, 15000); // Increased timeout for longer responses
+      }    } catch (error: any) {
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
         'Failed to send message';
       setError(errorMessage);
       console.error('Error sending message:', error);
 
-      // Remove the temporary message if there was an error
-      setMessages(prev => prev.filter(msg => msg.id !== `temp-${Date.now()}`));
+      // Clean up any temporary messages using our helper
+      cleanupThinkingMessages();
+
+      // Also remove any specific temp- messages
+      setMessages(prev => prev.filter(msg => {
+        const id = msg.id;
+        return !(typeof id === 'string' && id.startsWith('temp-'));
+      }));
+
+      // Add a more informative error message to the chat
+      const errorAssistantMessage: Message = {
+        id: generateId('error-'),
+        conversation: conversationId,
+        role: 'assistant',
+        content: `⚠️ Sorry, I encountered an issue processing your message: ${errorMessage.slice(0, 100)}${errorMessage.length > 100 ? '...' : ''}. Please try again.`,
+        created_at: new Date().toISOString()
+      };
+
+      setMessages(prev => [...prev, errorAssistantMessage]);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false);      // Final cleanup - ensure no thinking/typing messages remain
+      cleanupThinkingMessages();
+      // Clear typing text state to prevent any leftover typing indicators
+      setTimeout(() => {
+        setTypingText(null);
+      }, 100);
     }
   };
-
   // Simulate a response for demo mode
   const simulateResponse = async (userMessage: string, tempId: string) => {
     // Replace the temporary message with a "real" one (in a real app, this would come from the server)
     const realUserMessage: Message = {
-      id: Math.random().toString(36).substring(2, 15),
+      id: generateId('user-'),
       conversation: currentConversation!.id,
       role: 'user' as const,
       content: userMessage,
@@ -415,7 +563,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Add the assistant's response
     const assistantMessage: Message = {
-      id: Math.random().toString(36).substring(2, 15),
+      id: generateId('assistant-'),
       conversation: currentConversation!.id,
       role: 'assistant' as const,
       content: responseContent,
@@ -427,28 +575,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   // Replace the existing uploadDocument function with this fixed version
-
   const uploadDocument = async (formData: FormData): Promise<void> => {
     setIsLoading(true);
     setError(null);
+
     try {
-      // Add chat_id if there's a current conversation
       if (currentConversation && !formData.has('chat_id')) {
         formData.append('chat_id', currentConversation.id.toString());
       }
 
-      // Use the new session document upload API
       const document = await knowledgeService.uploadSessionDocument(formData);
-      console.log('Uploaded document:', document); // Debug log
-
-      // Refresh the session documents list
       await getSessionDocuments();
 
-      // Add a user message indicating document upload if we have an active conversation
       if (currentConversation) {
-        // Create and send user message for document upload
+        // Add user message for document upload
         const userMessageContent = `📄 Uploaded document: ${document.title}`;
-        
         const userMessageRequest: SendMessageRequest = {
           role: 'user',
           content: userMessageContent,
@@ -456,31 +597,43 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           conversation_id: currentConversation.id,
         };
 
+        // Create the user message in the backend
         const createMessageResponse = await chatService.createMessage(userMessageRequest);
 
+        // Add the user message to the UI
         const userMessage: Message = {
-          id: createMessageResponse.id || `upload-${Date.now()}`,
+          id: ensureStringId(createMessageResponse.id || generateId('upload-')),
           conversation: currentConversation.id,
           role: 'user',
           content: userMessageContent,
           created_at: document.created_at || new Date().toISOString()
-        };
+        };        // Add to messages without keeping any temporary messages
+        setMessages(prev => [
+          ...prev.filter(msg => {
+            const id = msg.id;
+            return !(typeof id === 'string' &&
+              (id.startsWith('thinking-') || id.startsWith('typing-') || id.startsWith('temp-')));
+          }),
+          userMessage
+        ]);        // First clean up any existing thinking messages
+        cleanupThinkingMessages();
 
-        // Update UI with user message
-        setMessages(prev => [...prev, userMessage]);
+        // Add enhanced thinking message
+        const thinkingMessage = generateThinkingMessage(currentConversation.id);
+        setMessages(prev => [...prev, thinkingMessage]);
 
         // Handle document summary if available
         const summary = document.document_summary || document.summary;
         if (summary) {
-          // Create document source
+          // Create source metadata
           const documentSource: DocumentSource = {
-            id: document.id.toString(),
+            id: ensureStringId(document.id),
             title: document.title,
             description: document.content_preview || 'Document preview',
             relevance_score: 1.0
           };
 
-          // Send assistant message with summary
+          // Create the assistant message in the backend
           const summaryRequest: SendMessageRequest = {
             role: 'assistant',
             content: summary,
@@ -490,33 +643,87 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           const createSummaryResponse = await chatService.createMessage(summaryRequest);
 
+          // Prepare the assistant message for UI
           const assistantMessage: Message = {
-            id: createSummaryResponse.id || `summary-${Date.now()}`,
+            id: ensureStringId(createSummaryResponse.id || generateId('summary-')),
             conversation: currentConversation.id,
             role: 'assistant',
             content: summary,
             created_at: new Date().toISOString(),
-            sources: [documentSource], // Add the document as a source
+            sources: [documentSource],
             experts_used: document.experts_used
+          };          // Clean up any thinking/typing messages before starting the typewriter effect
+          cleanupThinkingMessages();
+
+          // Use the improved typewriter effect directly without creating a placeholder message first
+          const abortTyping = typewriterEffect(
+            summary,
+            (fullText) => {
+              // After typing animation completes, add the final message
+              setMessages(prev => [
+                // Keep all regular messages (filter out any temporary ones)
+                ...prev.filter(msg => {
+                  const id = msg.id;
+                  return !(typeof id === 'string' &&
+                    (id.startsWith('thinking-') || id.startsWith('typing-')));
+                }),
+                // Add final message with complete content
+                { ...assistantMessage, content: fullText }
+              ]);
+            }
+          );
+
+          // Set safety timeout with slightly longer duration for document summaries
+          setTimeout(() => {
+            abortTyping();
+          }, 15000);
+        } else {
+          // If no summary is available, clean up thinking messages anyway
+          setMessages(prev => prev.filter(msg =>
+            !(typeof msg.id === 'string' && msg.id.startsWith('thinking-'))
+          ));
+
+          // Add a default response
+          const assistantMessage: Message = {
+            id: generateId('summary-'),
+            conversation: currentConversation.id,
+            role: 'assistant',
+            content: "Document was uploaded successfully. I'll reference it when answering your questions.",
+            created_at: new Date().toISOString(),
           };
 
-          // Use typewriter effect for the summary
-          typewriterEffect(summary, (fullText) => {
-            setTypingText(null);
-            setMessages(prev => [...prev, {
-              ...assistantMessage,
-              content: fullText,
-              sources: [documentSource] // Ensure source is preserved after typewriter effect
-            }]);
-          });
+          setMessages(prev => [...prev, assistantMessage]);
         }
-      }
-    } catch (error: any) {
+      }    } catch (error: any) {
+      // Clean up any thinking/typing messages on error
+      cleanupThinkingMessages();
+
       const errorMessage = error?.response?.data?.detail ||
         error?.message ||
         'Failed to upload document';
       setError(errorMessage);
       console.error('Error uploading document:', error);
+
+      // Add error message to the chat if we have an active conversation
+      if (currentConversation) {
+        const errorAssistantMessage: Message = {
+          id: generateId('error-'),
+          conversation: currentConversation.id,
+          role: 'assistant',
+          content: `⚠️ Error uploading document: ${errorMessage}. Please try again or contact support if this issue persists.`,
+          created_at: new Date().toISOString()
+        };
+
+        setMessages(prev => [
+          ...prev.filter(msg => {
+            const id = msg.id;
+            return !(typeof id === 'string' &&
+              (id.startsWith('thinking-') || id.startsWith('typing-') || id.startsWith('temp-')));
+          }),
+          errorAssistantMessage
+        ]);
+      }
+
       throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
